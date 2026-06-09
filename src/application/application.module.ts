@@ -13,10 +13,11 @@ import { ReconcileUseCase } from './use-cases/reconcile.usecase';
   providers: [
     ListProductsUseCase,
     CheckoutUseCase,
-    CheckoutWorker,
     GetOrderStatusUseCase,
     ReconcileUseCase,
-    ReconcileScheduler,
+    // Runtime-driven, not injected by anyone — keep out of `exports`:
+    CheckoutWorker, // self-registers with the queue via onModuleInit
+    ReconcileScheduler, // fired by @Interval (ScheduleModule)
   ],
   exports: [ListProductsUseCase, CheckoutUseCase, GetOrderStatusUseCase, ReconcileUseCase],
 })
