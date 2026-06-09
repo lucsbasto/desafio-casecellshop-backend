@@ -1,0 +1,36 @@
+# Runtime de produção: sobe a API com Redis real (cache + fila BullMQ).
+# Uso: docker compose up --build
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      # Ativa o caminho Redis real para todos os recursos.
+      CACHE_DRIVER: redis
+      QUEUE_DRIVER: redis
+      STOCK_DRIVER: redis
+      IDEMPOTENCY_DRIVER: redis
+      REDIS_URL: redis://redis:6379
+      PRODUCTS_CACHE_TTL_MS: '15000'
+      WORKER_MAX_ATTEMPTS: '3'
+      WORKER_BACKOFF_MS: '500'
+      ERP_FAIL_RATE: '0.3'
+      # Descomente para exportar traces ao Datadog Agent / OTel collector:
+      # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
