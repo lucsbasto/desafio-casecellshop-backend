@@ -12,27 +12,27 @@ export interface BullMqOptions {
   backoffMs: number;
 }
 
-/** Converte a REDIS_URL em opções de conexão do BullMQ (gestão própria de conexão). */
+/** Converts REDIS_URL into BullMQ connection options (self-managed connection). */
 function toConnection(redisUrl: string): ConnectionOptions {
   const u = new URL(redisUrl);
   return {
     host: u.hostname,
     port: Number(u.port || 6379),
     password: u.password || undefined,
-    // Requisito do BullMQ para a conexão bloqueante do worker.
+    // Required by BullMQ for the worker's blocking connection.
     maxRetriesPerRequest: null,
   };
 }
 
 /**
- * Fila BullMQ (Redis). Retry/backoff/DLQ nativos:
- * - `attempts` + `backoff` configuram o retry exponencial.
- * - jobs que esgotam tentativas disparam o evento 'failed' com attemptsMade
- *   final => chamamos `onExhausted` (compensação). BullMQ mantém o job em
- *   'failed' (atua como DLQ inspecionável).
+ * BullMQ queue (Redis). Native retry/backoff/DLQ:
+ * - `attempts` + `backoff` configure exponential retry.
+ * - Jobs that exhaust all attempts fire the 'failed' event with the final
+ *   attemptsMade => we call `onExhausted` (compensation). BullMQ keeps the job
+ *   in 'failed' state (acts as an inspectable DLQ).
  *
- * Recebe a URL (não a instância ioredis) para que o BullMQ use sua própria
- * conexão e evitar conflito de versões de ioredis aninhado.
+ * Accepts the URL (not the ioredis instance) so that BullMQ uses its own
+ * connection and avoids nested ioredis version conflicts.
  */
 export class BullMqQueueAdapter implements QueuePort {
   private readonly connection: ConnectionOptions;
@@ -54,7 +54,7 @@ export class BullMqQueueAdapter implements QueuePort {
       attempts: this.opts.maxAttempts,
       backoff: { type: 'exponential', delay: this.opts.backoffMs },
       removeOnComplete: 1000,
-      removeOnFail: false, // mantém para inspeção (DLQ lógica)
+      removeOnFail: false, // keep for inspection (logical DLQ)
     });
   }
 
@@ -69,7 +69,7 @@ export class BullMqQueueAdapter implements QueuePort {
 
     this.worker.on('failed', (job: Job<CheckoutJob> | undefined, err: Error) => {
       if (!job) return;
-      // Só compensa quando as tentativas se esgotaram de fato.
+      // Only compensate when attempts have actually been exhausted.
       if (job.attemptsMade >= this.opts.maxAttempts) {
         void processor.onExhausted(job.data, err);
       }

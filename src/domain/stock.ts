@@ -1,9 +1,9 @@
 /**
- * Lógica pura de reserva de estoque.
+ * Pure stock reservation logic.
  *
- * A ATOMICIDADE real (sob concorrência entre processos) é responsabilidade do
- * StockPort/adapter (Redis Lua DECRBY condicional, ou operação síncrona in-memory).
- * Esta função só expressa a REGRA: só reserva se houver saldo suficiente.
+ * Real ATOMICITY (under inter-process concurrency) is the responsibility of the
+ * StockPort/adapter (conditional Redis Lua DECRBY, or synchronous in-memory operation).
+ * This function only expresses the RULE: reserve only if there is sufficient balance.
  */
 export interface ReservationResult {
   ok: boolean;

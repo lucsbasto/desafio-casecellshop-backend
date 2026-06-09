@@ -2,7 +2,7 @@ import { Controller, Get, Header } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { MetricsService } from './metrics.service';
 
-/** Endpoint Prometheus. Fora do OpenAPI (é contrato de scraping, não de negócio). */
+/** Prometheus endpoint. Excluded from OpenAPI (it is a scraping contract, not a business one). */
 @ApiExcludeController()
 @Controller('metrics')
 export class MetricsController {

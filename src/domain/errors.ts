@@ -1,6 +1,6 @@
 /**
- * Erros de domínio. A camada de interface (exception filter) os traduz para
- * códigos HTTP, mantendo o domínio independente de HTTP.
+ * Domain errors. The interface layer (exception filter) translates them into
+ * HTTP status codes, keeping the domain independent of HTTP.
  */
 export class DomainError extends Error {
   constructor(
@@ -12,28 +12,28 @@ export class DomainError extends Error {
   }
 }
 
-/** Estoque insuficiente para reservar a quantidade pedida. -> HTTP 409 */
+/** Insufficient stock to reserve the requested quantity. -> HTTP 409 */
 export class InsufficientStockError extends DomainError {
   constructor(productId: string) {
     super(`Estoque insuficiente para o produto ${productId}`, 'INSUFFICIENT_STOCK');
   }
 }
 
-/** Produto não encontrado no catálogo. -> HTTP 404 */
+/** Product not found in the catalog. -> HTTP 404 */
 export class ProductNotFoundError extends DomainError {
   constructor(productId: string) {
     super(`Produto ${productId} não encontrado`, 'PRODUCT_NOT_FOUND');
   }
 }
 
-/** Pedido não encontrado. -> HTTP 404 */
+/** Order not found. -> HTTP 404 */
 export class OrderNotFoundError extends DomainError {
   constructor(orderId: string) {
     super(`Pedido ${orderId} não encontrado`, 'ORDER_NOT_FOUND');
   }
 }
 
-/** Transição de status inválida na máquina de estados do pedido. -> HTTP 409 */
+/** Invalid status transition in the order state machine. -> HTTP 409 */
 export class InvalidOrderTransitionError extends DomainError {
   constructor(from: string, to: string) {
     super(`Transição de status inválida: ${from} -> ${to}`, 'INVALID_ORDER_TRANSITION');

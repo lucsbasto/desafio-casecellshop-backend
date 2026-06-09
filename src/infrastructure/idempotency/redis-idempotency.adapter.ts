@@ -7,9 +7,9 @@ import {
 const KEY = (key: string) => `idem:${key}`;
 
 /**
- * Dedupe store em Redis. `SET key value NX PX ttl` é atômico: se a chave é nova,
- * grava e retorna OK (created); se já existe, retorna null e lemos o orderId
- * persistido (replay). Garante 1 pedido por Idempotency-Key.
+ * Redis dedupe store. `SET key value NX PX ttl` is atomic: if the key is new,
+ * it writes and returns OK (created); if it already exists, returns null and we
+ * read the persisted orderId (replay). Guarantees 1 order per Idempotency-Key.
  */
 export class RedisIdempotencyAdapter implements IdempotencyPort {
   constructor(private readonly redis: Redis) {}

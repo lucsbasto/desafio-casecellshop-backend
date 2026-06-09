@@ -17,9 +17,9 @@ import { TracingService } from '../../observability/tracing.service';
 import { runWithCorrelation } from '../../observability/correlation';
 
 /**
- * Worker do checkout assíncrono. Idempotente: ignora pedidos já terminais ou
- * inexistentes. Em sucesso confirma; ao esgotar tentativas, marca FAILED e
- * compensa (libera a reserva de estoque).
+ * Async checkout worker. Idempotent: ignores already-terminal or non-existent orders.
+ * On success confirms; when attempts are exhausted, marks FAILED and
+ * compensates (releases the stock reservation).
  */
 @Injectable()
 export class CheckoutWorker implements QueueProcessor, OnModuleInit {
@@ -92,11 +92,11 @@ export class CheckoutWorker implements QueueProcessor, OnModuleInit {
       this.logger.warn(
         `Falha ao faturar pedido ${order.id} (tentativa ${attempt}): ${(err as Error).message}`,
       );
-      throw err; // deixa a fila reprocessar (retry/backoff)
+      throw err; // lets the queue reprocess (retry/backoff)
     }
   }
 
-  /** Chamado pela fila quando as tentativas se esgotam: FAILED + compensação. */
+  /** Called by the queue when attempts are exhausted: FAILED + compensation. */
   async onExhausted(job: CheckoutJob, error: Error): Promise<void> {
     await runWithCorrelation(
       { correlationId: job.correlationId, orderId: job.orderId },
@@ -112,7 +112,7 @@ export class CheckoutWorker implements QueueProcessor, OnModuleInit {
         );
         await this.orders.save(failed);
 
-        // Compensação: devolve o estoque reservado.
+        // Compensation: returns the reserved stock.
         for (const item of order.items) {
           await this.stock.release(item.productId, item.quantity);
         }

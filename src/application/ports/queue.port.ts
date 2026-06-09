@@ -2,14 +2,14 @@ export const QUEUE_PORT = Symbol('QUEUE_PORT');
 
 export interface CheckoutJob {
   orderId: string;
-  /** Propaga o correlationId do request original para o worker (rastreabilidade). */
+  /** Propagates the correlationId from the original request to the worker (traceability). */
   correlationId: string;
 }
 
 /**
- * Processador de jobs. Mapeia diretamente para o BullMQ:
- * - `process` = função processadora (lançar erro => retry com backoff).
- * - `onExhausted` = evento 'failed' quando as tentativas se esgotam (compensação/DLQ).
+ * Job processor. Maps directly to BullMQ:
+ * - `process` = processor function (throwing an error => retry with backoff).
+ * - `onExhausted` = 'failed' event when attempts are exhausted (compensation/DLQ).
  */
 export interface QueueProcessor {
   process(job: CheckoutJob, attempt: number): Promise<void>;
@@ -17,17 +17,17 @@ export interface QueueProcessor {
 }
 
 /**
- * Porta de fila para o checkout assíncrono. A fila funciona como "outbox lógico":
- * o pedido é gravado (PENDING) antes de enfileirar.
- * - redis: BullMQ (retry/backoff/DLQ nativos).
- * - memory: fila em processo com retry/backoff equivalente.
+ * Queue port for async checkout. The queue acts as a "logical outbox":
+ * the order is saved (PENDING) before enqueueing.
+ * - redis: BullMQ (native retry/backoff/DLQ).
+ * - memory: in-process queue with equivalent retry/backoff.
  */
 export interface QueuePort {
   enqueue(job: CheckoutJob): Promise<void>;
-  /** Registra o processador. Chamado uma vez no bootstrap do worker. */
+  /** Registers the processor. Called once during worker bootstrap. */
   register(processor: QueueProcessor): void;
-  /** Profundidade atual da fila (para a métrica queue_depth). */
+  /** Current queue depth (for the queue_depth metric). */
   depth(): Promise<number>;
-  /** Encerramento gracioso. */
+  /** Graceful shutdown. */
   close(): Promise<void>;
 }

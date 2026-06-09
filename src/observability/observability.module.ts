@@ -4,8 +4,8 @@ import { MetricsController } from './metrics.controller';
 import { TracingService } from './tracing.service';
 
 /**
- * Módulo global de observabilidade: métricas (prom-client) e tracing (spans).
- * O logger (nestjs-pino) é configurado no AppModule via LoggerModule.forRoot.
+ * Global observability module: metrics (prom-client) and tracing (spans).
+ * The logger (nestjs-pino) is configured in AppModule via LoggerModule.forRoot.
  */
 @Global()
 @Module({

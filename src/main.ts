@@ -11,10 +11,10 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const config = loadConfig();
 
-  // Logger estruturado (pino) como logger oficial do Nest.
+  // Structured logger (pino) as the official Nest logger.
   app.useLogger(app.get(PinoLogger));
 
-  // Validação automática dos DTOs (class-validator) -> 400 padronizado.
+  // Automatic DTO validation (class-validator) -> standardized 400.
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );

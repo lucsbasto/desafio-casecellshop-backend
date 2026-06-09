@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { getCorrelationId } from './correlation';
 
 /**
- * Tracing leve baseado em spans.
+ * Lightweight span-based tracing.
  *
- * STUB JUSTIFICADO: para manter o desafio executável sem subir um collector,
- * usamos um tracer próprio que registra spans com duração e os correlaciona via
- * correlationId. Se `OTEL_EXPORTER_OTLP_ENDPOINT` estiver definido, o README
- * documenta como plugar o SDK OpenTelemetry real (compatível com Datadog Agent).
- * A API (`startSpan`/`end`) é deliberadamente compatível com OTel para troca fácil.
+ * JUSTIFIED STUB: to keep the challenge runnable without spinning up a collector,
+ * we use a custom tracer that records spans with duration and correlates them via
+ * correlationId. If `OTEL_EXPORTER_OTLP_ENDPOINT` is defined, the README
+ * documents how to plug in the real OpenTelemetry SDK (compatible with Datadog Agent).
+ * The API (`startSpan`/`end`) is deliberately OTel-compatible for easy swapping.
  */
 export interface Span {
   name: string;
@@ -45,7 +45,7 @@ export class TracingService {
     };
   }
 
-  /** Helper: instrumenta uma função assíncrona com um span. */
+  /** Helper: instruments an async function with a span. */
   async withSpan<T>(
     name: string,
     fn: () => Promise<T>,
@@ -67,7 +67,7 @@ export class TracingService {
     if (this.finished.length > this.maxBuffer) this.finished.shift();
   }
 
-  /** Exposto para inspeção/diagnóstico (e testes). */
+  /** Exposed for inspection/diagnostics (and tests). */
   recentSpans(): FinishedSpan[] {
     return [...this.finished];
   }

@@ -1,7 +1,7 @@
 import { ProductRepositoryPort } from '../../application/ports/repository.port';
 import { Product } from '../../domain/product';
 
-/** Seed do catálogo (capinhas). Em produção viria do read model / ERP. */
+/** Product catalog seed (phone cases). In production this would come from the read model / ERP. */
 export const PRODUCT_SEED: Product[] = [
   { id: 'CAPA-001', name: 'Capinha Silicone Preta iPhone 15', priceCents: 4990, stock: 25 },
   { id: 'CAPA-002', name: 'Capinha Transparente Galaxy S24', priceCents: 3990, stock: 10 },
@@ -11,8 +11,8 @@ export const PRODUCT_SEED: Product[] = [
 ];
 
 /**
- * "ERP fake": origem da verdade de produto/preço. Simula a latência de uma API
- * REST síncrona do ERP para que o ganho do cache seja observável.
+ * "Fake ERP": source of truth for product/price data. Simulates the latency of a
+ * synchronous ERP REST API so that the cache gain is observable.
  */
 export class InMemoryProductRepository implements ProductRepositoryPort {
   private readonly products: Map<string, Product>;

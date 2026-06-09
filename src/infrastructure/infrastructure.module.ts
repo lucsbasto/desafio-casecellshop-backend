@@ -100,8 +100,8 @@ const ErpProvider: Provider = {
 };
 
 /**
- * Inicializa o estoque a partir do catálogo (seed). Em produção o saldo viria do
- * read model sincronizado com o ERP; aqui semeamos no boot para a demo.
+ * Initializes stock from the product catalog (seed). In production the balance
+ * would come from the read model synced with the ERP; here we seed on boot for the demo.
  */
 class StockSeeder implements OnModuleInit {
   private readonly logger = new Logger(StockSeeder.name);

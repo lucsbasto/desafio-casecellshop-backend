@@ -1,4 +1,4 @@
-/** Configuração central tipada, lida de variáveis de ambiente com defaults seguros. */
+/** Centralized typed configuration, read from environment variables with safe defaults. */
 export type Driver = 'redis' | 'memory';
 
 function str(key: string, def: string): string {

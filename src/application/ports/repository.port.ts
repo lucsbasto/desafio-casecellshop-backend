@@ -5,18 +5,18 @@ export const PRODUCT_REPO_PORT = Symbol('PRODUCT_REPO_PORT');
 export const ORDER_REPO_PORT = Symbol('ORDER_REPO_PORT');
 
 /**
- * Repositório de produtos = "ERP fake" (origem da verdade de produto/preço).
- * Simula latência de uma API REST síncrona do ERP.
+ * Product repository = "fake ERP" (source of truth for product/price).
+ * Simulates the latency of a synchronous ERP REST API.
  */
 export interface ProductRepositoryPort {
   findAll(): Promise<Product[]>;
   findById(id: string): Promise<Product | undefined>;
 }
 
-/** Persistência de pedidos (read model da loja). */
+/** Order persistence (store read model). */
 export interface OrderRepositoryPort {
   save(order: Order): Promise<void>;
   findById(id: string): Promise<Order | undefined>;
-  /** Pedidos PENDING criados antes de `before` (para reconciliação). */
+  /** PENDING orders created before `before` (for reconciliation). */
   findPendingOlderThan(before: Date): Promise<Order[]>;
 }

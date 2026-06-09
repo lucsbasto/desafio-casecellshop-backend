@@ -4,9 +4,9 @@ import { ReconcileUseCase } from './use-cases/reconcile.usecase';
 import { APP_CONFIG, AppConfig } from '../infrastructure/config/app-config';
 
 /**
- * Dispara a reconciliação periodicamente (FR-11). Desabilitada em ambiente de
- * teste para não interferir nos cenários determinísticos (usa-se o endpoint
- * POST /admin/reconcile nos testes).
+ * Triggers reconciliation periodically (FR-11). Disabled in test environments
+ * to avoid interfering with deterministic scenarios (use the
+ * POST /admin/reconcile endpoint in tests instead).
  */
 @Injectable()
 export class ReconcileScheduler {

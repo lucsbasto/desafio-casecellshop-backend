@@ -47,7 +47,7 @@ describe('Order state machine', () => {
     const next = transition(o, OrderStatus.PROCESSING, new Date().toISOString(), 'go');
     expect(next.status).toBe(OrderStatus.PROCESSING);
     expect(next.history).toHaveLength(2);
-    expect(o.status).toBe(OrderStatus.PENDING); // imutável
+    expect(o.status).toBe(OrderStatus.PENDING); // immutable
   });
 
   it('isTerminal reconhece estados finais', () => {

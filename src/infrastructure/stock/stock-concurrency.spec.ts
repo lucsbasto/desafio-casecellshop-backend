@@ -1,8 +1,8 @@
 import { InMemoryStockAdapter } from './in-memory-stock.adapter';
 
 /**
- * Prova central do desafio: sob N reservas concorrentes para estoque M (< N),
- * no máximo M têm sucesso e o saldo nunca fica negativo (sem overselling).
+ * Core challenge proof: under N concurrent reservations for stock M (< N),
+ * at most M succeed and the balance never goes negative (no overselling).
  */
 describe('Reserva de estoque sob concorrência', () => {
   it('não permite overselling com 50 reservas concorrentes para estoque 10', async () => {
@@ -27,7 +27,7 @@ describe('Reserva de estoque sob concorrência', () => {
     await stock.init('CAPA-Y', 5);
 
     const a = await stock.reserve('CAPA-Y', 3);
-    const b = await stock.reserve('CAPA-Y', 3); // só restam 2 -> falha
+    const b = await stock.reserve('CAPA-Y', 3); // only 2 remaining -> fails
     const c = await stock.reserve('CAPA-Y', 2);
 
     expect(a.ok).toBe(true);

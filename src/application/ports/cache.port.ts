@@ -1,8 +1,8 @@
 export const CACHE_PORT = Symbol('CACHE_PORT');
 
 /**
- * Porta de cache (cache-aside). A implementação deve proteger contra
- * cache stampede (single-flight) no método getOrLoad.
+ * Cache port (cache-aside). The implementation must protect against
+ * cache stampede (single-flight) in the getOrLoad method.
  */
 export interface CachePort {
   get<T>(key: string): Promise<T | undefined>;
@@ -10,10 +10,10 @@ export interface CachePort {
   del(key: string): Promise<void>;
 
   /**
-   * Retorna do cache se presente (hit); caso contrário executa `loader` (miss),
-   * grava com TTL e retorna. Concorrentes na mesma chave compartilham UMA única
-   * execução do loader (single-flight) — previne stampede.
-   * `staleOnError`: se true e o loader falhar, serve o último valor stale (fallback).
+   * Returns from cache if present (hit); otherwise executes `loader` (miss),
+   * stores with TTL and returns. Concurrent callers on the same key share ONE single
+   * loader execution (single-flight) — prevents stampede.
+   * `staleOnError`: if true and the loader fails, serves the last stale value (fallback).
    */
   getOrLoad<T>(
     key: string,

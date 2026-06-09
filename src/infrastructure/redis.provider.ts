@@ -9,9 +9,9 @@ function anyRedisDriver(cfg: AppConfig): boolean {
 }
 
 /**
- * Provê uma conexão ioredis somente quando algum driver=redis. Caso contrário,
- * retorna null (modo in-memory, sem dependência de Redis — roda sem Docker).
- * `maxRetriesPerRequest: null` é requisito do BullMQ.
+ * Provides an ioredis connection only when at least one driver=redis. Otherwise,
+ * returns null (in-memory mode, no Redis dependency — runs without Docker).
+ * `maxRetriesPerRequest: null` is required by BullMQ.
  */
 export const RedisProvider: Provider = {
   provide: REDIS_CLIENT,

@@ -5,8 +5,8 @@ import { AppModule } from './app.module';
 import { buildOpenApiDocument } from './swagger';
 
 /**
- * Gera o arquivo openapi.json sem subir o servidor HTTP.
- * Uso: `npm run openapi`.
+ * Generates the openapi.json file without starting the HTTP server.
+ * Usage: `npm run openapi`.
  */
 async function generate(): Promise<void> {
   const app = await NestFactory.create(AppModule, { logger: false });

@@ -33,7 +33,7 @@ export interface CheckoutOutput {
   replay: boolean;
 }
 
-/** Erro de replay cuja tentativa original não chegou a criar o pedido. -> 409 */
+/** Replay error whose original attempt never created the order. -> 409 */
 export class DuplicateRequestError extends Error {
   readonly code = 'DUPLICATE_REQUEST';
   constructor() {
@@ -42,8 +42,8 @@ export class DuplicateRequestError extends Error {
 }
 
 /**
- * Inicia o checkout assíncrono. Ordem (anti pedido/mensagem-fantasma, design D7):
- *   idempotência -> reserva atômica -> grava PENDING -> enfileira -> 202.
+ * Initiates the async checkout. Order (anti ghost-order/message, design D7):
+ *   idempotency -> atomic reservation -> save PENDING -> enqueue -> 202.
  */
 @Injectable()
 export class CheckoutUseCase {
@@ -90,7 +90,7 @@ export class CheckoutUseCase {
     const orderId = randomUUID();
     setOrderId(orderId);
 
-    // 1) Idempotência: reivindica a chave atomicamente.
+    // 1) Idempotency: claims the key atomically.
     const rec = await this.idempotency.remember(key, orderId, this.config.idempotencyTtlMs);
     if (!rec.created) {
       const existing = await this.orders.findById(rec.orderId);
@@ -98,11 +98,11 @@ export class CheckoutUseCase {
         setOrderId(existing.id);
         return { order: existing, replay: true };
       }
-      // Chave reivindicada por uma tentativa que não persistiu pedido.
+      // Key claimed by an attempt that did not persist the order.
       throw new DuplicateRequestError();
     }
 
-    // 2) Valida produtos / preços e reserva estoque atomicamente.
+    // 2) Validates products / prices and atomically reserves stock.
     const reserved: OrderItem[] = [];
     let totalCents = 0;
     try {
@@ -123,14 +123,14 @@ export class CheckoutUseCase {
         totalCents += product.priceCents * item.quantity;
       }
     } catch (err) {
-      // Compensação: libera o que já foi reservado nesta tentativa.
+      // Compensation: releases what was already reserved in this attempt.
       for (const r of reserved) {
         await this.stock.release(r.productId, r.quantity);
       }
       throw err;
     }
 
-    // 3) Grava o pedido PENDING (origem da verdade) ANTES de enfileirar.
+    // 3) Saves the PENDING order (source of truth) BEFORE enqueueing.
     const now = new Date().toISOString();
     const order: Order = {
       id: orderId,
@@ -145,7 +145,7 @@ export class CheckoutUseCase {
     };
     await this.orders.save(order);
 
-    // 4) Enfileira (outbox lógico). Se falhar aqui, a reconciliação reenfileira.
+    // 4) Enqueues (logical outbox). If this fails, reconciliation will re-enqueue.
     await this.tracing.withSpan('queue.enqueue', () =>
       this.queue.enqueue({ orderId: order.id, correlationId: input.correlationId }),
     );

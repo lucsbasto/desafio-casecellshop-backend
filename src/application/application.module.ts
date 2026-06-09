@@ -7,7 +7,7 @@ import { GetOrderStatusUseCase } from './use-cases/get-order-status.usecase';
 import { ReconcileUseCase } from './use-cases/reconcile.usecase';
 import { ReconcileScheduler } from './reconcile.scheduler';
 
-/** Camada de aplicação: orquestra as portas. Exporta os use-cases aos controllers. */
+/** Application layer: orchestrates the ports. Exports use-cases to controllers. */
 @Module({
   imports: [InfrastructureModule],
   providers: [

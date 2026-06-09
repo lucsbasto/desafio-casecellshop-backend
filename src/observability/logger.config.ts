@@ -4,8 +4,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { CORRELATION_HEADER } from './correlation';
 
 /**
- * Configuração do nestjs-pino: logs estruturados em JSON com correlationId.
- * Em dev usa pino-pretty; em produção, JSON puro (ideal para Datadog/coletores).
+ * nestjs-pino configuration: structured JSON logs with correlationId.
+ * Uses pino-pretty in dev; pure JSON in production (ideal for Datadog/collectors).
  */
 export function buildLoggerParams(serviceName: string, level: string, env: string): Params {
   const isDev = env !== 'production';
@@ -13,7 +13,7 @@ export function buildLoggerParams(serviceName: string, level: string, env: strin
     pinoHttp: {
       level,
       base: { service: serviceName },
-      // Gera/propaga o correlationId e o expõe no header da resposta.
+      // Generates/propagates the correlationId and exposes it in the response header.
       genReqId: (req: IncomingMessage, res: ServerResponse): string => {
         const incoming = (req.headers[CORRELATION_HEADER] as string) || randomUUID();
         res.setHeader(CORRELATION_HEADER, incoming);
@@ -22,7 +22,7 @@ export function buildLoggerParams(serviceName: string, level: string, env: strin
       customProps: (req: IncomingMessage) => ({
         correlationId: (req as IncomingMessage & { id?: string }).id,
       }),
-      // Reduz ruído: health/metrics não precisam de log de request.
+      // Reduces noise: health/metrics endpoints do not need request logging.
       autoLogging: {
         ignore: (req: IncomingMessage) =>
           req.url === '/metrics' || req.url === '/health',

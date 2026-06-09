@@ -3,10 +3,10 @@ import { Order } from '../../domain/order';
 export const ERP_PORT = Symbol('ERP_PORT');
 
 /**
- * Cliente do ERP central (faturamento). Aqui é um fake que simula latência alta
- * e falhas intermitentes — o ofensor #3 do case (ERP demora para faturar).
+ * Central ERP client (billing). Here it is a fake that simulates high latency
+ * and intermittent failures — offender #3 in the case study (ERP is slow to invoice).
  */
 export interface ErpPort {
-  /** Fatura o pedido no ERP. Lança em caso de falha (timeout/erro do ERP). */
+  /** Invoices the order in the ERP. Throws on failure (timeout/ERP error). */
   invoice(order: Order): Promise<{ erpInvoiceId: string }>;
 }

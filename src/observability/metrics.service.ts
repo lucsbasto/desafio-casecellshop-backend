@@ -8,8 +8,8 @@ import {
 } from 'prom-client';
 
 /**
- * Registro central de métricas Prometheus. Exposto em GET /metrics.
- * Cobre cache, checkout, fila/worker, ERP e prevenção de overselling (SPEC OBS-2).
+ * Central Prometheus metrics registry. Exposed at GET /metrics.
+ * Covers cache, checkout, queue/worker, ERP, and overselling prevention (SPEC OBS-2).
  */
 @Injectable()
 export class MetricsService {

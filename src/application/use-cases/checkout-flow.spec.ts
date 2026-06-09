@@ -37,13 +37,13 @@ async function buildHarness(opts: {
   const metrics = new MetricsService();
   const tracing = new TracingService();
   const stock = new InMemoryStockAdapter();
-  // Semeia o estoque a partir do catálogo (equivalente ao StockSeeder do módulo).
+  // Seeds stock from the catalog (equivalent to the module's StockSeeder).
   for (const p of opts.seed) await stock.init(p.id, p.stock);
   const idempotency = new InMemoryIdempotencyAdapter();
   const queue = new InMemoryQueueAdapter({ maxAttempts: config.worker.maxAttempts, backoffMs: 0 });
   const orders = new InMemoryOrderRepository();
   const products = new InMemoryProductRepository(opts.seed, 0);
-  // random fixo: latência 0 e decisão de falha determinística por erpFailRate.
+  // fixed random: latency 0 and deterministic failure decision by erpFailRate.
   const erp = new FakeErpClient({
     failRate: opts.erpFailRate,
     minLatencyMs: 0,

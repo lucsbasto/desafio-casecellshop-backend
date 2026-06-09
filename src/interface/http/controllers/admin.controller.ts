@@ -5,7 +5,7 @@ import {
   ReconcileUseCase,
 } from '../../../application/use-cases/reconcile.usecase';
 
-/** Endpoints operacionais (reconciliação manual). Em produção: protegido/admin. */
+/** Operational endpoints (manual reconciliation). In production: protected/admin. */
 @ApiTags('admin')
 @Controller('admin')
 export class AdminController {

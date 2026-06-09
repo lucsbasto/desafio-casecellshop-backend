@@ -6,14 +6,14 @@ interface Entry<T> {
 }
 
 /**
- * Cache in-memory com TTL e SINGLE-FLIGHT (request coalescing) para prevenir
- * cache stampede: misses concorrentes na mesma chave compartilham uma única
- * execução do loader. Guarda o último valor para fallback stale-while-error.
+ * In-memory cache with TTL and SINGLE-FLIGHT (request coalescing) to prevent
+ * cache stampede: concurrent misses on the same key share a single loader
+ * execution. Stores the last known value for stale-while-error fallback.
  */
 export class InMemoryCacheAdapter implements CachePort {
   private readonly store = new Map<string, Entry<unknown>>();
   private readonly inflight = new Map<string, Promise<unknown>>();
-  /** Último valor conhecido (mesmo expirado) para fallback em erro do loader. */
+  /** Last known value (even if expired) for loader-error fallback. */
   private readonly lastKnown = new Map<string, unknown>();
 
   async get<T>(key: string): Promise<T | undefined> {
@@ -46,7 +46,7 @@ export class InMemoryCacheAdapter implements CachePort {
       return { value: cached, hit: true, stale: false };
     }
 
-    // Single-flight: se já há um loader em voo para esta chave, reaproveita.
+    // Single-flight: if there is already an in-flight loader for this key, reuse it.
     const existing = this.inflight.get(key);
     if (existing) {
       const value = (await existing) as T;
@@ -68,7 +68,7 @@ export class InMemoryCacheAdapter implements CachePort {
       const value = (await promise) as T;
       return { value, hit: false, stale: false };
     } catch (err) {
-      // Fallback: serve o último valor bom (stale-while-error) se permitido.
+      // Fallback: serve the last good value (stale-while-error) if allowed.
       if (opts.staleOnError && this.lastKnown.has(key)) {
         return { value: this.lastKnown.get(key) as T, hit: false, stale: true };
       }

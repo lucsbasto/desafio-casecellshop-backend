@@ -1,16 +1,16 @@
 /**
- * Produto do catálogo. Origem da verdade é o "ERP" (aqui um repositório fake).
- * `priceCents` evita problemas de ponto flutuante com dinheiro.
+ * Catalog product. The source of truth is the "ERP" (here a fake repository).
+ * `priceCents` avoids floating-point issues with monetary values.
  */
 export interface Product {
   id: string;
   name: string;
   priceCents: number;
-  /** Disponibilidade corrente. No read model da loja seria projetada do ERP. */
+  /** Current availability. In the store's read model this would be projected from the ERP. */
   stock: number;
 }
 
-/** Visão pública do produto exposta pela vitrine (não vaza detalhes internos). */
+/** Public product view exposed by the storefront (does not leak internal details). */
 export interface ProductView {
   id: string;
   name: string;

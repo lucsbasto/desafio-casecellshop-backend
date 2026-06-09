@@ -6,16 +6,16 @@ export interface ReserveOutcome {
 }
 
 /**
- * Porta de estoque com operações ATÔMICAS sob concorrência.
- * - redis: Lua DECRBY condicional.
- * - memory: operação síncrona (Node single-thread garante atomicidade por tick).
+ * Stock port with ATOMIC operations under concurrency.
+ * - redis: conditional Lua DECRBY.
+ * - memory: synchronous operation (Node single-thread guarantees atomicity per tick).
  */
 export interface StockPort {
-  /** Inicializa/define o saldo de um produto (seed). */
+  /** Initializes/sets the balance of a product (seed). */
   init(productId: string, quantity: number): Promise<void>;
   get(productId: string): Promise<number>;
-  /** Reserva atômica: decrementa só se houver saldo >= quantity. */
+  /** Atomic reservation: decrements only if balance >= quantity. */
   reserve(productId: string, quantity: number): Promise<ReserveOutcome>;
-  /** Compensação: devolve a quantidade ao saldo. */
+  /** Compensation: returns the quantity to the balance. */
   release(productId: string, quantity: number): Promise<void>;
 }

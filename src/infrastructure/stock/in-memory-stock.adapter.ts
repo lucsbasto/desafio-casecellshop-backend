@@ -2,10 +2,10 @@ import { ReserveOutcome, StockPort } from '../../application/ports/stock.port';
 import { tryReserve, release } from '../../domain/stock';
 
 /**
- * Estoque in-memory. O Node é single-thread: cada `reserve` executa de forma
- * síncrona e atômica dentro de um tick — não há await entre o check e o
- * decremento — então N reserves concorrentes via Promise.all não causam race.
- * É o equivalente in-memory ao DECRBY condicional do Redis.
+ * In-memory stock. Node is single-threaded: each `reserve` executes synchronously
+ * and atomically within a tick — there is no await between the check and the
+ * decrement — so N concurrent reserves via Promise.all do not cause a race condition.
+ * This is the in-memory equivalent of Redis's conditional DECRBY.
  */
 export class InMemoryStockAdapter implements StockPort {
   private readonly stock = new Map<string, number>();
@@ -19,7 +19,7 @@ export class InMemoryStockAdapter implements StockPort {
   }
 
   async reserve(productId: string, quantity: number): Promise<ReserveOutcome> {
-    // Seção crítica síncrona: sem await entre leitura e escrita => atômica.
+    // Synchronous critical section: no await between read and write => atomic.
     const current = this.stock.get(productId) ?? 0;
     const result = tryReserve(current, quantity);
     if (result.ok) {

@@ -6,7 +6,7 @@ export interface FakeErpOptions {
   failRate: number; // 0..1
   minLatencyMs: number;
   maxLatencyMs: number;
-  /** Injeção determinística para testes (sem aleatoriedade). */
+  /** Deterministic injection for tests (no randomness). */
   random?: () => number;
 }
 
@@ -18,8 +18,8 @@ export class ErpInvoiceError extends Error {
 }
 
 /**
- * ERP simulado: latência alta e falhas intermitentes — reproduz o ofensor #3 do
- * case ("API do ERP demora para faturar"). Usado pelo worker com retry/backoff.
+ * Simulated ERP: high latency and intermittent failures — reproduces offender #3 from
+ * the case study ("ERP API takes too long to invoice"). Used by the worker with retry/backoff.
  */
 export class FakeErpClient implements ErpPort {
   private readonly random: () => number;

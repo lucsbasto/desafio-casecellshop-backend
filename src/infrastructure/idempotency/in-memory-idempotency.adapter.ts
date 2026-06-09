@@ -9,8 +9,8 @@ interface Stored {
 }
 
 /**
- * Dedupe store in-memory. `remember` é síncrono na seção crítica (sem await
- * entre checar e gravar) => atômico no Node. Equivalente ao SET NX EX do Redis.
+ * In-memory dedupe store. `remember` is synchronous in the critical section (no
+ * await between check and write) => atomic in Node. Equivalent to Redis SET NX EX.
  */
 export class InMemoryIdempotencyAdapter implements IdempotencyPort {
   private readonly store = new Map<string, Stored>();

@@ -2,9 +2,9 @@ import type { Redis } from 'ioredis';
 import { CachePort } from '../../application/ports/cache.port';
 
 /**
- * Cache Redis (cache-aside). Single-flight em processo + jitter de TTL mitigam
- * stampede; para coordenação cross-instância usaria um lock SET NX curto (citado
- * no README). Mantém último valor para fallback stale-while-error.
+ * Redis cache (cache-aside). In-process single-flight + TTL jitter mitigate
+ * stampede; for cross-instance coordination a short SET NX lock would be used
+ * (referenced in the README). Keeps the last value for stale-while-error fallback.
  */
 export class RedisCacheAdapter implements CachePort {
   private readonly inflight = new Map<string, Promise<unknown>>();

@@ -30,7 +30,7 @@ describe('InMemoryCacheAdapter', () => {
       Array.from({ length: 20 }, () => cache.getOrLoad('hot', 1000, loader)),
     );
 
-    expect(loads).toBe(1); // stampede evitado
+    expect(loads).toBe(1); // stampede avoided
     expect(results.every((r) => r.value === 'value')).toBe(true);
   });
 

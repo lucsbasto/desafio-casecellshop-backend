@@ -7,8 +7,8 @@ import { QUEUE_PORT } from '../src/application/ports/queue.port';
 import { InMemoryQueueAdapter } from '../src/infrastructure/queue/in-memory-queue.adapter';
 
 /**
- * E2E HTTP de contrato. Roda 100% in-memory (sem Docker): NODE_ENV=test e
- * ERP_FAIL_RATE=0 para um caminho determinístico até CONFIRMED.
+ * HTTP contract E2E tests. Runs 100% in-memory (no Docker): NODE_ENV=test and
+ * ERP_FAIL_RATE=0 for a deterministic path to CONFIRMED.
  */
 describe('CaseCellShop API (e2e)', () => {
   let app: INestApplication;
@@ -44,7 +44,7 @@ describe('CaseCellShop API (e2e)', () => {
     expect(r1.body.length).toBeGreaterThan(0);
     expect(r1.body[0]).toHaveProperty('priceCents');
 
-    // 2ª chamada deve ser hit; comprovado pela métrica.
+    // 2nd call should be a hit; confirmed by the metric.
     await request(app.getHttpServer()).get('/products').expect(200);
     const metrics = await request(app.getHttpServer()).get('/metrics').expect(200);
     expect(metrics.text).toContain('cache_requests_total');
@@ -70,7 +70,7 @@ describe('CaseCellShop API (e2e)', () => {
     expect(res.body).toMatchObject({ status: 'PENDING', replay: false });
     expect(res.body.orderId).toBeDefined();
 
-    // Aguarda o worker processar e confirma via GET /status.
+    // Waits for the worker to process and confirms via GET /status.
     await queue.drain();
     const status = await request(app.getHttpServer())
       .get(`/orders/${res.body.orderId}/status`)

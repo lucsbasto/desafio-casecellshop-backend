@@ -4,12 +4,12 @@ import { ReserveOutcome, StockPort } from '../../application/ports/stock.port';
 const KEY = (productId: string) => `stock:${productId}`;
 
 /**
- * Estoque em Redis com reserva ATÔMICA via script Lua: o check-and-decrement
- * roda como uma única operação atômica no servidor Redis, eliminando o TOCTOU
- * mesmo com múltiplas instâncias da aplicação.
+ * Redis stock with ATOMIC reservation via Lua script: the check-and-decrement
+ * runs as a single atomic operation on the Redis server, eliminating TOCTOU
+ * even across multiple application instances.
  */
 export class RedisStockAdapter implements StockPort {
-  // KEYS[1]=chave do estoque, ARGV[1]=quantidade. Retorna [ok(0|1), saldo].
+  // KEYS[1]=stock key, ARGV[1]=quantity. Returns [ok(0|1), balance].
   private static readonly RESERVE_LUA = `
     local current = tonumber(redis.call('GET', KEYS[1]) or '0')
     local qty = tonumber(ARGV[1])

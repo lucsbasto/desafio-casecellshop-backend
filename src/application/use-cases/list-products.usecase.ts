@@ -14,8 +14,8 @@ const ALL_KEY = 'products:all';
 const ONE_KEY = (id: string) => `products:${id}`;
 
 /**
- * Vitrine: lê produtos via cache-aside (TTL + single-flight) sobre o "ERP fake".
- * Registra cache hit/miss e serve stale em caso de falha do ERP (fallback).
+ * Storefront: reads products via cache-aside (TTL + single-flight) over the "fake ERP".
+ * Records cache hit/miss and serves stale on ERP failure (fallback).
  */
 @Injectable()
 export class ListProductsUseCase {
@@ -28,7 +28,7 @@ export class ListProductsUseCase {
   ) {}
 
   private ttl(): number {
-    // Jitter no TTL para espalhar expirações e mitigar stampede.
+    // TTL jitter to spread expirations and mitigate stampede.
     const base = this.config.cache.productsTtlMs;
     const jitter = Math.floor(Math.random() * this.config.cache.stampedeJitterMs);
     return base + jitter;

@@ -2,20 +2,20 @@ export const IDEMPOTENCY_PORT = Symbol('IDEMPOTENCY_PORT');
 
 export interface IdempotencyRecord {
   orderId: string;
-  /** true se este chamador criou o registro agora; false se já existia (replay). */
+  /** true if this caller created the record now; false if it already existed (replay). */
   created: boolean;
 }
 
 /**
- * Porta de idempotência. Garante que uma mesma Idempotency-Key produza um único
- * recurso (orderId), tolerando retry e duplo clique.
+ * Idempotency port. Ensures that the same Idempotency-Key produces a single
+ * resource (orderId), tolerating retries and double-clicks.
  */
 export interface IdempotencyPort {
   /**
-   * Reserva atômica da chave:
-   * - se a chave é nova, persiste `orderId` e retorna { created: true }.
-   * - se já existe, retorna o orderId existente e { created: false } (replay).
-   * Implementação: Redis SET NX EX / Map com lock.
+   * Atomic key reservation:
+   * - if the key is new, persists `orderId` and returns { created: true }.
+   * - if it already exists, returns the existing orderId and { created: false } (replay).
+   * Implementation: Redis SET NX EX / Map with lock.
    */
   remember(key: string, orderId: string, ttlMs: number): Promise<IdempotencyRecord>;
 }

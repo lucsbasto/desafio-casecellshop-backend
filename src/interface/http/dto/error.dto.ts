@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-/** Schema padronizado de erro (sucesso e erro documentados no OpenAPI). */
+/** Standardized error schema (both success and error cases documented in OpenAPI). */
 export class ErrorDto {
   @ApiProperty({ example: 409 })
   statusCode!: number;

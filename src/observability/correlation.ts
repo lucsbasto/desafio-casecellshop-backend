@@ -6,8 +6,8 @@ export interface CorrelationStore {
 }
 
 /**
- * Propaga o correlationId (e orderId quando existir) por toda a cadeia assíncrona
- * — request HTTP e também o worker — sem precisar passar por parâmetro.
+ * Propagates the correlationId (and orderId when present) throughout the entire async chain
+ * — HTTP request and also the worker — without needing to pass it as a parameter.
  */
 export const correlationStorage = new AsyncLocalStorage<CorrelationStore>();
 

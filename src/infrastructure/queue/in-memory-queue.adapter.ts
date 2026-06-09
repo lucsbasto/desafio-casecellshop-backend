@@ -7,7 +7,7 @@ import {
 export interface InMemoryQueueOptions {
   maxAttempts: number;
   backoffMs: number;
-  /** Em testes, usar 0 para tornar o backoff determinístico/instantâneo. */
+  /** In tests, use 0 to make the backoff deterministic/instant. */
   backoffFactor?: number;
 }
 
@@ -17,12 +17,12 @@ interface QueuedJob {
 }
 
 /**
- * Fila in-memory com retry + backoff exponencial, espelhando o comportamento do
- * BullMQ. Mantém contagem de jobs em voo para a métrica queue_depth e invoca
- * `onExhausted` (compensação/DLQ) quando as tentativas se esgotam.
+ * In-memory queue with retry + exponential backoff, mirroring BullMQ behavior.
+ * Tracks the count of in-flight jobs for the queue_depth metric and invokes
+ * `onExhausted` (compensation/DLQ) when all attempts are exhausted.
  *
- * `drain()` permite que os testes aguardem o processamento completo de forma
- * determinística (sem sleeps frágeis).
+ * `drain()` lets tests wait for full processing in a deterministic way
+ * (without fragile sleeps).
  */
 export class InMemoryQueueAdapter implements QueuePort {
   private processor?: QueueProcessor;
@@ -55,7 +55,7 @@ export class InMemoryQueueAdapter implements QueuePort {
         await this.sleep(delay);
         await this.run({ job: queued.job, attempt: queued.attempt + 1 });
       } else {
-        // Tentativas esgotadas: compensação / dead-letter.
+        // Attempts exhausted: compensation / dead-letter.
         await this.processor.onExhausted(queued.job, error);
       }
     } finally {
@@ -72,7 +72,7 @@ export class InMemoryQueueAdapter implements QueuePort {
     return this.pending;
   }
 
-  /** Aguarda todos os jobs enfileirados terminarem (uso em testes). */
+  /** Waits for all enqueued jobs to finish (for use in tests). */
   async drain(): Promise<void> {
     await Promise.allSettled([...this.settled]);
   }

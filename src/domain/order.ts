@@ -1,13 +1,13 @@
 import { InvalidOrderTransitionError } from './errors';
 
 export enum OrderStatus {
-  /** Pedido criado e estoque reservado; aguardando processamento do worker. */
+  /** Order created and stock reserved; waiting for worker processing. */
   PENDING = 'PENDING',
-  /** Worker pegou o job e está faturando no ERP. */
+  /** Worker picked up the job and is invoicing in the ERP. */
   PROCESSING = 'PROCESSING',
-  /** ERP faturou com sucesso. Estado final feliz. */
+  /** ERP invoiced successfully. Happy final state. */
   CONFIRMED = 'CONFIRMED',
-  /** Esgotadas as tentativas no ERP; reserva de estoque compensada. Estado final. */
+  /** ERP retries exhausted; stock reservation compensated. Final state. */
   FAILED = 'FAILED',
 }
 
@@ -31,11 +31,11 @@ export interface Order {
   totalCents: number;
   createdAt: string;
   updatedAt: string;
-  /** Tentativas de processamento já feitas pelo worker (observabilidade/reconciliação). */
+  /** Processing attempts already made by the worker (observability/reconciliation). */
   attempts: number;
 }
 
-/** Transições válidas da máquina de estados. */
+/** Valid state machine transitions. */
 const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.FAILED],
   [OrderStatus.PROCESSING]: [OrderStatus.CONFIRMED, OrderStatus.FAILED, OrderStatus.PENDING],
@@ -52,11 +52,11 @@ export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
 }
 
 /**
- * Aplica uma transição de status validando a máquina de estados.
- * Função pura: devolve um novo Order, não muta o original.
+ * Applies a status transition by validating the state machine.
+ * Pure function: returns a new Order, does not mutate the original.
  */
 export function transition(order: Order, to: OrderStatus, at: string, reason?: string): Order {
-  if (order.status === to) return order; // idempotente: já está no destino
+  if (order.status === to) return order; // idempotent: already at the target status
   if (!canTransition(order.status, to)) {
     throw new InvalidOrderTransitionError(order.status, to);
   }

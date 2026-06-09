@@ -1,12 +1,12 @@
 import { OrderRepositoryPort } from '../../application/ports/repository.port';
 import { Order, OrderStatus } from '../../domain/order';
 
-/** Persistência in-memory de pedidos (read model da loja). */
+/** In-memory order persistence (store read model). */
 export class InMemoryOrderRepository implements OrderRepositoryPort {
   private readonly orders = new Map<string, Order>();
 
   async save(order: Order): Promise<void> {
-    // Clona para evitar mutação externa acidental do estado guardado.
+    // Clone to prevent accidental external mutation of the stored state.
     this.orders.set(order.id, structuredClone(order));
   }
 

@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 
-/** Configuração compartilhada do OpenAPI (usada pelo runtime e pelo export). */
+/** Shared OpenAPI configuration (used by both the runtime and the export). */
 export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('CaseCellShop Backend')

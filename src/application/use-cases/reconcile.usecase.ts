@@ -16,9 +16,9 @@ export interface ReconcileReport {
 }
 
 /**
- * Reconciliação simples (anti pedido-fantasma): varre pedidos PENDING órfãos.
- * - Mais velhos que RECONCILE_AGE_MS: reenfileira (o enqueue pode ter falhado).
- * - Mais velhos que RECONCILE_MAX_AGE_MS: marca FAILED e compensa o estoque.
+ * Simple reconciliation (anti ghost-order): scans orphan PENDING orders.
+ * - Older than RECONCILE_AGE_MS: re-enqueues (the enqueue may have failed).
+ * - Older than RECONCILE_MAX_AGE_MS: marks FAILED and compensates stock.
  */
 @Injectable()
 export class ReconcileUseCase {
@@ -43,7 +43,7 @@ export class ReconcileUseCase {
     for (const order of candidates) {
       const createdAt = new Date(order.createdAt);
       if (createdAt < maxAgeCutoff) {
-        // Velho demais: falha definitiva + compensação.
+        // Too old: definitive failure + compensation.
         const failedOrder = transition(
           order,
           OrderStatus.FAILED,
@@ -56,7 +56,7 @@ export class ReconcileUseCase {
         }
         failed++;
       } else {
-        // Reenfileira: o job pode ter se perdido entre gravar e enfileirar.
+        // Re-enqueues: the job may have been lost between saving and enqueueing.
         await this.queue.enqueue({
           orderId: order.id,
           correlationId: `reconcile-${order.id}`,

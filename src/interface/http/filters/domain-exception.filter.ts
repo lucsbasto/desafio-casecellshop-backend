@@ -18,7 +18,7 @@ import { DuplicateRequestError } from '../../../application/use-cases/checkout.u
 import { getCorrelationId } from '../../../observability/correlation';
 import { ErrorDto } from '../dto/error.dto';
 
-/** Mapeia erros de domínio -> status HTTP, mantendo o domínio agnóstico de HTTP. */
+/** Maps domain errors -> HTTP status, keeping the domain agnostic of HTTP. */
 function statusFor(err: unknown): number {
   if (err instanceof ProductNotFoundError || err instanceof OrderNotFoundError) {
     return HttpStatus.NOT_FOUND;
@@ -47,7 +47,7 @@ export class DomainExceptionFilter implements ExceptionFilter {
     let message: string;
 
     if (exception instanceof HttpException) {
-      // Erros do framework (validação class-validator => 400, etc.).
+      // Framework errors (class-validator validation => 400, etc.).
       statusCode = exception.getStatus();
       const body = exception.getResponse();
       error = exception.name;
