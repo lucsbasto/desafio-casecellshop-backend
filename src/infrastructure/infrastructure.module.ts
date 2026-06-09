@@ -18,7 +18,7 @@ import { InMemoryIdempotencyAdapter } from './idempotency/in-memory-idempotency.
 import { RedisIdempotencyAdapter } from './idempotency/redis-idempotency.adapter';
 import { BullMqQueueAdapter } from './queue/bullmq-queue.adapter';
 import { InMemoryQueueAdapter } from './queue/in-memory-queue.adapter';
-import { REDIS_CLIENT, RedisProvider } from './redis.provider';
+import { REDIS_CLIENT, RedisLifecycle, RedisProvider } from './redis.provider';
 import { InMemoryOrderRepository } from './repo/in-memory-order.repo';
 import { InMemoryProductRepository } from './repo/in-memory-product.repo';
 import { InMemoryStockAdapter } from './stock/in-memory-stock.adapter';
@@ -117,6 +117,7 @@ class StockSeeder implements OnModuleInit {
 const PROVIDERS: Provider[] = [
   ConfigProvider,
   RedisProvider,
+  RedisLifecycle,
   CacheProvider,
   StockProvider,
   IdempotencyProvider,

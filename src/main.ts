@@ -22,6 +22,10 @@ async function bootstrap(): Promise<void> {
 
   setupSwagger(app);
 
+  // Intercepts SIGTERM/SIGINT so OnModuleDestroy hooks (Redis/BullMQ connections)
+  // run on graceful shutdown (Docker/Kubernetes).
+  app.enableShutdownHooks();
+
   await app.listen(config.port);
   new Logger('Bootstrap').log(
     `CaseCellShop backend on :${config.port} (Swagger em /docs, métricas em /metrics)`,

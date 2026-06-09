@@ -38,7 +38,9 @@ export interface Order {
 /** Valid state machine transitions. */
 const ALLOWED: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.FAILED],
-  [OrderStatus.PROCESSING]: [OrderStatus.CONFIRMED, OrderStatus.FAILED, OrderStatus.PENDING],
+  // PROCESSING never goes back to PENDING: that would let reconciliation
+  // re-enqueue an order that already has an active worker job (double-processing).
+  [OrderStatus.PROCESSING]: [OrderStatus.CONFIRMED, OrderStatus.FAILED],
   [OrderStatus.CONFIRMED]: [],
   [OrderStatus.FAILED]: [],
 };

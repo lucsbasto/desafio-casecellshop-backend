@@ -58,6 +58,15 @@ export class CheckoutWorker implements QueueProcessor, OnModuleInit {
       this.logger.log(`Pedido ${order.id} já está ${order.status}; job idempotente, ignorado`);
       return;
     }
+    // A concurrent worker (BullMQ concurrency / duplicate delivery) may already be
+    // invoicing this order. PROCESSING is not terminal, so guard it explicitly to
+    // avoid a double ERP invoice. A retry of THIS attempt re-reads PENDING and proceeds.
+    if (order.status === OrderStatus.PROCESSING && attempt === order.attempts) {
+      this.logger.warn(
+        `Pedido ${order.id} já em PROCESSING (attempt ${attempt}); job duplicado ignorado`,
+      );
+      return;
+    }
 
     const processing = transition(
       { ...order, attempts: attempt },

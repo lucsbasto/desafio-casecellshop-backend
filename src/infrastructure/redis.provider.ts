@@ -1,4 +1,4 @@
-import { Logger, Provider } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, Provider } from '@nestjs/common';
 import IORedis, { Redis } from 'ioredis';
 import { APP_CONFIG, AppConfig } from './config/app-config';
 
@@ -25,3 +25,17 @@ export const RedisProvider: Provider = {
     return client;
   },
 };
+
+/**
+ * Closes the shared ioredis connection on graceful shutdown so the process can
+ * exit cleanly (and Jest doesn't warn about open handles). No-op in memory mode.
+ * Requires `app.enableShutdownHooks()` in the bootstrap.
+ */
+@Injectable()
+export class RedisLifecycle implements OnModuleDestroy {
+  constructor(@Inject(REDIS_CLIENT) private readonly client: Redis | null) {}
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.client) await this.client.quit();
+  }
+}

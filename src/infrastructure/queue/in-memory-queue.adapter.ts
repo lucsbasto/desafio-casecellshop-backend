@@ -1,31 +1,35 @@
 import { CheckoutJob, QueuePort, QueueProcessor } from '../../application/ports/queue.port';
+import { BackoffStrategy, ExponentialBackoff } from './backoff.strategy';
 
 export interface InMemoryQueueOptions {
   maxAttempts: number;
   backoffMs: number;
   /** In tests, use 0 to make the backoff deterministic/instant. */
   backoffFactor?: number;
-}
-
-interface QueuedJob {
-  job: CheckoutJob;
-  attempt: number;
+  maxBackoffMs?: number;
 }
 
 /**
- * In-memory queue with retry + exponential backoff, mirroring BullMQ behavior.
- * Tracks the count of in-flight jobs for the queue_depth metric and invokes
- * `onExhausted` (compensation/DLQ) when all attempts are exhausted.
+ * In-memory queue with retry + exponential backoff, mirroring BullMQ behavior
+ * via a shared BackoffStrategy. Tracks in-flight jobs for the queue_depth metric
+ * and invokes `onExhausted` (compensation/DLQ) when all attempts are exhausted.
  *
- * `drain()` lets tests wait for full processing in a deterministic way
- * (without fragile sleeps).
+ * `drain()` lets tests wait for full processing deterministically (no sleeps).
  */
 export class InMemoryQueueAdapter implements QueuePort {
   private processor?: QueueProcessor;
   private pending = 0;
-  private readonly settled: Array<Promise<void>> = [];
+  /** In-flight job promises; entries self-remove on settle to avoid unbounded growth. */
+  private readonly inFlight = new Set<Promise<void>>();
+  private readonly backoff: BackoffStrategy;
 
-  constructor(private readonly opts: InMemoryQueueOptions) {}
+  constructor(private readonly opts: InMemoryQueueOptions) {
+    this.backoff = new ExponentialBackoff(
+      opts.backoffMs,
+      opts.backoffFactor ?? 2,
+      opts.maxBackoffMs ?? 30_000,
+    );
+  }
 
   register(processor: QueueProcessor): void {
     this.processor = processor;
@@ -33,24 +37,33 @@ export class InMemoryQueueAdapter implements QueuePort {
 
   async enqueue(job: CheckoutJob): Promise<void> {
     this.pending++;
-    const p = this.run({ job, attempt: 1 }).finally(() => this.pending--);
-    this.settled.push(p);
+    const p = this.run(job)
+      .finally(() => {
+        this.pending--;
+        this.inFlight.delete(p);
+      })
+      // Swallow here so an unexpected throw can't become an unhandled rejection;
+      // run() already routes business failures to onExhausted.
+      .catch(() => undefined);
+    this.inFlight.add(p);
   }
 
-  private async run(queued: QueuedJob): Promise<void> {
+  /** Iterative retry loop (no recursion, so deep retry counts can't blow the stack). */
+  private async run(job: CheckoutJob): Promise<void> {
     if (!this.processor) throw new Error('Nenhum processador registrado na fila');
-    try {
-      await this.processor.process(queued.job, queued.attempt);
-    } catch (err) {
-      const error = err as Error;
-      if (queued.attempt < this.opts.maxAttempts) {
-        const factor = this.opts.backoffFactor ?? 2;
-        const delay = this.opts.backoffMs * factor ** (queued.attempt - 1);
-        await this.sleep(delay);
-        await this.run({ job: queued.job, attempt: queued.attempt + 1 });
-      } else {
-        // Attempts exhausted: compensation / dead-letter.
-        await this.processor.onExhausted(queued.job, error);
+    let attempt = 1;
+    while (true) {
+      try {
+        await this.processor.process(job, attempt);
+        return;
+      } catch (err) {
+        if (attempt >= this.opts.maxAttempts) {
+          // Attempts exhausted: compensation / dead-letter.
+          await this.processor.onExhausted(job, err as Error);
+          return;
+        }
+        await this.sleep(this.backoff.nextDelay(attempt + 1));
+        attempt++;
       }
     }
   }
@@ -66,7 +79,10 @@ export class InMemoryQueueAdapter implements QueuePort {
 
   /** Waits for all enqueued jobs to finish (for use in tests). */
   async drain(): Promise<void> {
-    await Promise.allSettled([...this.settled]);
+    // Loop because a job may enqueue follow-up work while we await the snapshot.
+    while (this.inFlight.size > 0) {
+      await Promise.allSettled([...this.inFlight]);
+    }
   }
 
   async close(): Promise<void> {

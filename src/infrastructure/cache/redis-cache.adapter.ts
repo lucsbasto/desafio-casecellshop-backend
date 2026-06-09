@@ -15,7 +15,14 @@ export class RedisCacheAdapter implements CachePort {
   async get<T>(key: string): Promise<T | undefined> {
     const raw = await this.redis.get(key);
     if (raw === null) return undefined;
-    return JSON.parse(raw) as T;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      // Corrupted/foreign value: treat as a miss and evict the bad key instead
+      // of letting a SyntaxError bubble up and surface as a 500.
+      await this.redis.del(key);
+      return undefined;
+    }
   }
 
   async set<T>(key: string, value: T, ttlMs: number): Promise<void> {

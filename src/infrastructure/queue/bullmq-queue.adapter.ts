@@ -1,3 +1,4 @@
+import { Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConnectionOptions, Job, Queue, QueueEvents, Worker } from 'bullmq';
 import { CheckoutJob, QueuePort, QueueProcessor } from '../../application/ports/queue.port';
 
@@ -30,7 +31,8 @@ function toConnection(redisUrl: string): ConnectionOptions {
  * Accepts the URL (not the ioredis instance) so that BullMQ uses its own
  * connection and avoids nested ioredis version conflicts.
  */
-export class BullMqQueueAdapter implements QueuePort {
+export class BullMqQueueAdapter implements QueuePort, OnModuleDestroy {
+  private readonly logger = new Logger(BullMqQueueAdapter.name);
   private readonly connection: ConnectionOptions;
   private readonly queue: Queue;
   private readonly events: QueueEvents;
@@ -67,9 +69,20 @@ export class BullMqQueueAdapter implements QueuePort {
       if (!job) return;
       // Only compensate when attempts have actually been exhausted.
       if (job.attemptsMade >= this.opts.maxAttempts) {
-        void processor.onExhausted(job.data, err);
+        // Never drop this promise silently: if compensation fails the stock stays
+        // reserved (hidden overselling), so surface it loudly for alerting.
+        processor.onExhausted(job.data, err).catch((compErr: Error) => {
+          this.logger.error(
+            `Compensação (onExhausted) falhou para o pedido ${job.data.orderId}: ${compErr.message}`,
+            compErr.stack,
+          );
+        });
       }
     });
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    await this.close();
   }
 
   async depth(): Promise<number> {
