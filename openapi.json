@@ -1,0 +1,472 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/products": {
+      "get": {
+        "operationId": "ProductsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Catálogo (servido via cache com TTL)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "operationId": "ProductsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "catalog"
+        ]
+      }
+    },
+    "/checkout": {
+      "post": {
+        "operationId": "CheckoutController_start",
+        "parameters": [
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Chave de idempotência. Reenvios com a mesma chave retornam o mesmo pedido (tolera retry/duplo clique).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "202 Accepted: pedido criado (PENDING) e enfileirado para processamento.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutAcceptedDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payload inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Estoque insuficiente ou requisição duplicada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "checkout"
+        ]
+      }
+    },
+    "/orders/{orderId}/status": {
+      "get": {
+        "operationId": "OrdersController_status",
+        "parameters": [
+          {
+            "name": "orderId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status e histórico do pedido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderStatusDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "orders"
+        ]
+      }
+    },
+    "/admin/reconcile": {
+      "post": {
+        "operationId": "AdminController_runReconcile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Executa a reconciliação de pedidos PENDING órfãos"
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/admin/health": {
+      "get": {
+        "operationId": "AdminController_health",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Health check simples"
+          }
+        },
+        "tags": [
+          "admin"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Liveness check"
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "CaseCellShop Backend",
+    "description": "Catálogo com cache, checkout assíncrono (202) e status de pedido. Desafio Pleno Backend.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "catalog",
+      "description": "Vitrine de produtos (cache com TTL)"
+    },
+    {
+      "name": "checkout",
+      "description": "Início de compra assíncrona"
+    },
+    {
+      "name": "orders",
+      "description": "Acompanhamento de pedidos"
+    },
+    {
+      "name": "admin",
+      "description": "Operações (reconciliação)"
+    }
+  ],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "ProductDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "CAPA-001"
+          },
+          "name": {
+            "type": "string",
+            "example": "Capinha Silicone Preta iPhone 15"
+          },
+          "priceCents": {
+            "type": "number",
+            "example": 4990,
+            "description": "Preço em centavos (evita float)"
+          },
+          "available": {
+            "type": "boolean",
+            "example": true
+          },
+          "stock": {
+            "type": "number",
+            "example": 25
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "priceCents",
+          "available",
+          "stock"
+        ]
+      },
+      "ErrorDto": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "example": 409
+          },
+          "error": {
+            "type": "string",
+            "example": "INSUFFICIENT_STOCK"
+          },
+          "message": {
+            "type": "string",
+            "example": "Estoque insuficiente para o produto CAPA-003"
+          },
+          "correlationId": {
+            "type": "string",
+            "example": "b7e2...-correlation-id"
+          },
+          "timestamp": {
+            "type": "string",
+            "example": "2026-06-09T03:00:00.000Z"
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "correlationId",
+          "timestamp"
+        ]
+      },
+      "CheckoutItemDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "CAPA-001"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 2,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "productId",
+          "quantity"
+        ]
+      },
+      "CheckoutRequestDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CheckoutItemDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "CheckoutAcceptedDto": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string",
+            "example": "a1b2c3d4-...",
+            "description": "ID do pedido criado"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PROCESSING",
+              "CONFIRMED",
+              "FAILED"
+            ],
+            "example": "PENDING"
+          },
+          "replay": {
+            "type": "boolean",
+            "example": false,
+            "description": "true se a resposta veio de uma requisição idempotente repetida"
+          }
+        },
+        "required": [
+          "orderId",
+          "status",
+          "replay"
+        ]
+      },
+      "OrderItemDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "string",
+            "example": "CAPA-001"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "productId",
+          "quantity"
+        ]
+      },
+      "OrderTransitionDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PROCESSING",
+              "CONFIRMED",
+              "FAILED"
+            ]
+          },
+          "at": {
+            "type": "string",
+            "example": "2026-06-09T03:00:00.000Z"
+          },
+          "reason": {
+            "type": "string",
+            "example": "tentativa 1"
+          }
+        },
+        "required": [
+          "status",
+          "at"
+        ]
+      },
+      "OrderStatusDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "PROCESSING",
+              "CONFIRMED",
+              "FAILED"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemDto"
+            }
+          },
+          "totalCents": {
+            "type": "number",
+            "example": 9980
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderTransitionDto"
+            }
+          },
+          "attempts": {
+            "type": "number",
+            "example": 1
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "items",
+          "totalCents",
+          "history",
+          "attempts",
+          "createdAt",
+          "updatedAt"
+        ]
+      }
+    }
+  }
+}
