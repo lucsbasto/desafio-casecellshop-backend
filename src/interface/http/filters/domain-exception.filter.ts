@@ -1,0 +1,83 @@
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import {
+  DomainError,
+  InsufficientStockError,
+  InvalidOrderTransitionError,
+  OrderNotFoundError,
+  ProductNotFoundError,
+} from '../../../domain/errors';
+import { DuplicateRequestError } from '../../../application/use-cases/checkout.usecase';
+import { getCorrelationId } from '../../../observability/correlation';
+import { ErrorDto } from '../dto/error.dto';
+
+/** Mapeia erros de domínio -> status HTTP, mantendo o domínio agnóstico de HTTP. */
+function statusFor(err: unknown): number {
+  if (err instanceof ProductNotFoundError || err instanceof OrderNotFoundError) {
+    return HttpStatus.NOT_FOUND;
+  }
+  if (
+    err instanceof InsufficientStockError ||
+    err instanceof InvalidOrderTransitionError ||
+    err instanceof DuplicateRequestError
+  ) {
+    return HttpStatus.CONFLICT;
+  }
+  return HttpStatus.INTERNAL_SERVER_ERROR;
+}
+
+@Catch()
+export class DomainExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(DomainExceptionFilter.name);
+
+  catch(exception: unknown, host: ArgumentsHost): void {
+    const ctx = host.switchToHttp();
+    const res = ctx.getResponse<Response>();
+    const correlationId = getCorrelationId() ?? 'unknown';
+
+    let statusCode: number;
+    let error: string;
+    let message: string;
+
+    if (exception instanceof HttpException) {
+      // Erros do framework (validação class-validator => 400, etc.).
+      statusCode = exception.getStatus();
+      const body = exception.getResponse();
+      error = exception.name;
+      message =
+        typeof body === 'string'
+          ? body
+          : (Array.isArray((body as { message?: unknown }).message)
+              ? ((body as { message: string[] }).message.join('; '))
+              : ((body as { message?: string }).message ?? exception.message));
+    } else if (exception instanceof DomainError || exception instanceof DuplicateRequestError) {
+      statusCode = statusFor(exception);
+      error = (exception as DomainError).code ?? exception.name;
+      message = (exception as Error).message;
+    } else {
+      statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
+      error = 'INTERNAL_ERROR';
+      message = 'Erro interno inesperado';
+      this.logger.error(
+        `Erro não tratado: ${(exception as Error)?.message}`,
+        (exception as Error)?.stack,
+      );
+    }
+
+    const payload: ErrorDto = {
+      statusCode,
+      error,
+      message,
+      correlationId,
+      timestamp: new Date().toISOString(),
+    };
+    res.status(statusCode).json(payload);
+  }
+}
