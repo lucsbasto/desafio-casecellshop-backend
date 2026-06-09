@@ -44,14 +44,14 @@ export class CheckoutRequestDto {
 
 export class CheckoutAcceptedDto {
   @ApiProperty({ example: 'a1b2c3d4-...', description: 'ID do pedido criado' })
-  orderId!: string;
+  readonly orderId!: string;
 
   @ApiProperty({ enum: OrderStatus, example: OrderStatus.PENDING })
-  status!: OrderStatus;
+  readonly status!: OrderStatus;
 
   @ApiProperty({
     example: false,
     description: 'true se a resposta veio de uma requisição idempotente repetida',
   })
-  replay!: boolean;
+  readonly replay!: boolean;
 }

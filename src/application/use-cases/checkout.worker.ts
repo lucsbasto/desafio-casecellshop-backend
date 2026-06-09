@@ -112,10 +112,10 @@ export class CheckoutWorker implements QueueProcessor, OnModuleInit {
         );
         await this.orders.save(failed);
 
-        // Compensation: returns the reserved stock.
-        for (const item of order.items) {
-          await this.stock.release(item.productId, item.quantity);
-        }
+        // Compensation: returns the reserved stock (releases run concurrently).
+        await Promise.all(
+          order.items.map((item) => this.stock.release(item.productId, item.quantity)),
+        );
         this.metrics.workerJobs.inc({ result: 'failed' });
         this.logger.error(`Pedido ${order.id} FAILED após esgotar tentativas; estoque compensado`);
       },

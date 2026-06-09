@@ -3,45 +3,45 @@ import { OrderStatus } from '../../../domain/order';
 
 export class OrderTransitionDto {
   @ApiProperty({ enum: OrderStatus })
-  status!: OrderStatus;
+  readonly status!: OrderStatus;
 
   @ApiProperty({ example: '2026-06-09T03:00:00.000Z' })
-  at!: string;
+  readonly at!: string;
 
   @ApiProperty({ required: false, example: 'tentativa 1' })
-  reason?: string;
+  readonly reason?: string;
 }
 
 export class OrderItemDto {
   @ApiProperty({ example: 'CAPA-001' })
-  productId!: string;
+  readonly productId!: string;
 
   @ApiProperty({ example: 2 })
-  quantity!: number;
+  readonly quantity!: number;
 }
 
 export class OrderStatusDto {
   @ApiProperty()
-  id!: string;
+  readonly id!: string;
 
   @ApiProperty({ enum: OrderStatus })
-  status!: OrderStatus;
+  readonly status!: OrderStatus;
 
   @ApiProperty({ type: [OrderItemDto] })
-  items!: OrderItemDto[];
+  readonly items!: OrderItemDto[];
 
   @ApiProperty({ example: 9980 })
-  totalCents!: number;
+  readonly totalCents!: number;
 
   @ApiProperty({ type: [OrderTransitionDto] })
-  history!: OrderTransitionDto[];
+  readonly history!: OrderTransitionDto[];
 
   @ApiProperty({ example: 1 })
-  attempts!: number;
+  readonly attempts!: number;
 
   @ApiProperty()
-  createdAt!: string;
+  readonly createdAt!: string;
 
   @ApiProperty()
-  updatedAt!: string;
+  readonly updatedAt!: string;
 }

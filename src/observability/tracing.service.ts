@@ -24,8 +24,11 @@ interface FinishedSpan {
 
 @Injectable()
 export class TracingService {
-  private readonly finished: FinishedSpan[] = [];
+  // Fixed-size ring buffer: O(1) writes, bounded memory, no array reindexing.
   private readonly maxBuffer = 1000;
+  private readonly finished: (FinishedSpan | undefined)[] = new Array(this.maxBuffer);
+  private writeIdx = 0;
+  private count = 0;
 
   startSpan(name: string, attributes: Record<string, unknown> = {}): Span {
     const startedAt = process.hrtime.bigint();
@@ -63,12 +66,19 @@ export class TracingService {
   }
 
   private record(span: FinishedSpan): void {
-    this.finished.push(span);
-    if (this.finished.length > this.maxBuffer) this.finished.shift();
+    this.finished[this.writeIdx] = span;
+    this.writeIdx = (this.writeIdx + 1) % this.maxBuffer;
+    if (this.count < this.maxBuffer) this.count++;
   }
 
-  /** Exposed for inspection/diagnostics (and tests). */
+  /** Exposed for inspection/diagnostics (and tests). Oldest-to-newest order. */
   recentSpans(): FinishedSpan[] {
-    return [...this.finished];
+    const out: FinishedSpan[] = [];
+    const start = this.count < this.maxBuffer ? 0 : this.writeIdx;
+    for (let i = 0; i < this.count; i++) {
+      const span = this.finished[(start + i) % this.maxBuffer];
+      if (span) out.push(span);
+    }
+    return out;
   }
 }

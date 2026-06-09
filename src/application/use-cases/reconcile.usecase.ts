@@ -48,9 +48,9 @@ export class ReconcileUseCase {
           'reconciliação: PENDING órfão expirado',
         );
         await this.orders.save(failedOrder);
-        for (const item of order.items) {
-          await this.stock.release(item.productId, item.quantity);
-        }
+        await Promise.all(
+          order.items.map((item) => this.stock.release(item.productId, item.quantity)),
+        );
         failed++;
       } else {
         // Re-enqueues: the job may have been lost between saving and enqueueing.

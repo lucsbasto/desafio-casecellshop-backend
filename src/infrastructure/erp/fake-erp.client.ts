@@ -6,8 +6,11 @@ export interface FakeErpOptions {
   failRate: number; // 0..1
   minLatencyMs: number;
   maxLatencyMs: number;
-  /** Deterministic injection for tests (no randomness). */
+  /** Deterministic injection for tests. Shared default for both draws below. */
   random?: () => number;
+  /** Optional dedicated draws so latency and failure aren't correlated. */
+  randomLatency?: () => number;
+  randomFail?: () => number;
 }
 
 export class ErpInvoiceError extends Error {
@@ -22,18 +25,21 @@ export class ErpInvoiceError extends Error {
  * the case study ("ERP API takes too long to invoice"). Used by the worker with retry/backoff.
  */
 export class FakeErpClient implements ErpPort {
-  private readonly random: () => number;
+  private readonly randomLatency: () => number;
+  private readonly randomFail: () => number;
 
   constructor(private readonly opts: FakeErpOptions) {
-    this.random = opts.random ?? Math.random;
+    const shared = opts.random ?? Math.random;
+    this.randomLatency = opts.randomLatency ?? shared;
+    this.randomFail = opts.randomFail ?? shared;
   }
 
   async invoice(order: Order): Promise<{ erpInvoiceId: string }> {
     const span = this.opts.maxLatencyMs - this.opts.minLatencyMs;
-    const latency = this.opts.minLatencyMs + Math.floor(this.random() * Math.max(0, span));
+    const latency = this.opts.minLatencyMs + Math.floor(this.randomLatency() * Math.max(0, span));
     if (latency > 0) await new Promise((r) => setTimeout(r, latency));
 
-    if (this.random() < this.opts.failRate) {
+    if (this.randomFail() < this.opts.failRate) {
       throw new ErpInvoiceError(order.id);
     }
     return { erpInvoiceId: `ERP-${randomUUID().slice(0, 8)}` };
