@@ -1,0 +1,68 @@
+flowchart LR
+    subgraph DRIVING["🟦 Driving Side (entrada)"]
+        direction TB
+        HTTP["interface/http<br/>Controllers · DTOs · Guards<br/>Filters · Middleware"]
+        SCHED["Schedulers<br/>@Interval reconcile"]
+    end
+
+    subgraph CORE["🟩 Núcleo da Aplicação (agnóstico de infra)"]
+        direction TB
+        subgraph UC["application/use-cases"]
+            CHK["CheckoutUseCase"]
+            WRK["CheckoutWorker"]
+            REC["ReconcileUseCase"]
+            LST["ListProductsUseCase"]
+            GET["GetOrderStatusUseCase"]
+        end
+        subgraph DOM["domain (regras puras)"]
+            ORD["Order + State Machine"]
+            STK["Stock (tryReserve/release)"]
+            PRD["Product / ProductView"]
+            ERR["DomainError hierarchy"]
+        end
+        subgraph PORTS["application/ports (interfaces)"]
+            P1(["CACHE_PORT"])
+            P2(["STOCK_PORT"])
+            P3(["IDEMPOTENCY_PORT"])
+            P4(["QUEUE_PORT"])
+            P5(["REPOSITORY_PORT"])
+            P6(["ERP_PORT"])
+        end
+    end
+
+    subgraph DRIVEN["🟧 Driven Side (adapters de infra)"]
+        direction TB
+        A1["CacheAdapter<br/>redis ┆ in-memory"]
+        A2["StockAdapter<br/>redis(Lua) ┆ in-memory"]
+        A3["IdempotencyAdapter<br/>redis(Lua) ┆ in-memory"]
+        A4["QueueAdapter<br/>BullMQ ┆ in-memory"]
+        A5["RepoAdapter<br/>in-memory Map"]
+        A6["FakeErpClient"]
+    end
+
+    HTTP --> UC
+    SCHED --> REC
+    UC --> DOM
+    UC --> PORTS
+
+    P1 -.implements.-> A1
+    P2 -.implements.-> A2
+    P3 -.implements.-> A3
+    P4 -.implements.-> A4
+    P5 -.implements.-> A5
+    P6 -.implements.-> A6
+
+    A1 --> REDIS[("Redis")]
+    A2 --> REDIS
+    A3 --> REDIS
+    A4 --> REDIS
+    A6 --> ERPSYS["ERP externo<br/>(fake, lento/instável)"]
+
+    classDef core fill:#d5f5e3,stroke:#27ae60,color:#145a32
+    classDef driving fill:#d6eaf8,stroke:#2980b9,color:#1b4f72
+    classDef driven fill:#fdebd0,stroke:#e67e22,color:#7e5109
+    classDef port fill:#fff,stroke:#16a085,stroke-width:2px,color:#0e6655
+    class CHK,WRK,REC,LST,GET,ORD,STK,PRD,ERR core
+    class HTTP,SCHED driving
+    class A1,A2,A3,A4,A5,A6 driven
+    class P1,P2,P3,P4,P5,P6 port

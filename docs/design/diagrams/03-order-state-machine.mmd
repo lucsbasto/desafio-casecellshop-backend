@@ -1,0 +1,13 @@
+stateDiagram-v2
+    [*] --> PENDING: checkout (estoque reservado)
+    PENDING --> PROCESSING: worker pega o job
+    PENDING --> FAILED: reconcile (órfão muito antigo) + release
+    PROCESSING --> CONFIRMED: ERP faturou ✅
+    PROCESSING --> FAILED: esgotou tentativas + release
+    CONFIRMED --> [*]
+    FAILED --> [*]
+
+    note right of PROCESSING
+        Estado terminal nunca transiciona.
+        PROCESSING ↛ PENDING (anti double-processing).
+    end note

@@ -1,0 +1,26 @@
+flowchart TD
+    START([Checkout]) --> RES["Reserva estoque<br/>(Lua CAS)"]
+    RES --> SAVE["Salva PENDING<br/>(source of truth)"]
+    SAVE --> ENQ{"enqueue OK?"}
+    ENQ -- sim --> PROC["Worker processa"]
+    ENQ -- "não (falha)" --> ORPH["Pedido órfão PENDING"]
+
+    SCHED["⏱️ @Interval 15s<br/>ReconcileScheduler"] --> SCAN["findPendingOlderThan"]
+    SCAN --> ORPH
+    ORPH --> DECIDE{"idade do pedido"}
+    DECIDE -- "recente" --> REENQ["re-enqueue"] --> PROC
+    DECIDE -- "muito antigo" --> FAILC["FAILED + release estoque"]
+
+    PROC --> RETRY{"ERP ok?"}
+    RETRY -- sim --> CONF["CONFIRMED"]
+    RETRY -- "não" --> BACK["retry + backoff exponencial"]
+    BACK --> EXH{"esgotou<br/>maxAttempts?"}
+    EXH -- não --> PROC
+    EXH -- sim --> COMP["onExhausted:<br/>FAILED + release<br/>(compensação) + DLQ"]
+
+    classDef ok fill:#d5f5e3,stroke:#27ae60,color:#145a32
+    classDef bad fill:#fadbd8,stroke:#c0392b,color:#7b241c
+    classDef safe fill:#fdebd0,stroke:#e67e22,color:#7e5109
+    class CONF,REENQ ok
+    class FAILC,COMP bad
+    class SCHED,SCAN,ORPH safe

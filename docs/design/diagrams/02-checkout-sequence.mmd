@@ -1,0 +1,40 @@
+sequenceDiagram
+    autonumber
+    actor C as Cliente
+    participant Ctl as CheckoutController
+    participant UC as CheckoutUseCase
+    participant Idem as IDEMPOTENCY_PORT
+    participant Stk as STOCK_PORT
+    participant Repo as ORDER_REPO_PORT
+    participant Q as QUEUE_PORT
+    participant W as CheckoutWorker
+    participant Erp as ERP_PORT
+
+    C->>Ctl: POST /checkout (Idempotency-Key)
+    Ctl->>UC: execute(dto, key)
+    UC->>Idem: remember(key) [Lua SET NX atômico]
+    alt chave já vista
+        Idem-->>UC: replay
+        UC-->>C: 202 (pedido existente)
+    else chave nova
+        UC->>Stk: tryReserve(itens) [Lua CAS anti-oversell]
+        Stk-->>UC: ok / InsufficientStock(409)
+        UC->>Repo: save(Order = PENDING)
+        UC->>Q: enqueue(CheckoutJob)
+        UC-->>C: 202 Accepted (orderId)
+    end
+
+    Note over Q,W: processamento em background
+    Q->>W: process(job)
+    W->>Repo: transition PENDING→PROCESSING
+    W->>Erp: invoice(order)
+    alt sucesso
+        Erp-->>W: ok
+        W->>Repo: transition →CONFIRMED
+    else falha (retry+backoff)
+        Erp-->>W: erro
+        W->>Q: re-tentar (exponential backoff)
+        Note over W,Q: ao esgotar maxAttempts → onExhausted
+        W->>Repo: transition →FAILED
+        W->>Stk: release(itens) [compensação]
+    end

@@ -77,6 +77,11 @@ Arquitetura **hexagonal (ports & adapters)** em 4 camadas. O domínio é puro; a
 depende de **portas** (interfaces); a infraestrutura provê **adapters** (in-memory ou Redis),
 selecionados por variável de ambiente.
 
+> 📐 **Aprofundamento:** [`docs/DESIGN-PATTERNS.md`](docs/DESIGN-PATTERNS.md) — 25 design patterns
+> usados (com evidência `arquivo:linha`, tradeoffs e padrões deliberadamente _não_ usados) ·
+> [`docs/ARCHITECTURE-DIAGRAM.md`](docs/ARCHITECTURE-DIAGRAM.md) — diagramas Mermaid (hexágono,
+> sequência do checkout, máquina de estados, resiliência, cache-aside).
+
 ```
 interface/   Controllers HTTP, DTOs, Swagger, exception filter, correlation middleware
 application/ Use-cases (ListProducts, Checkout, GetOrderStatus, Reconcile) + Worker + Ports
@@ -192,7 +197,7 @@ src/
   interface/http/ controllers/ dto/ filters/
   observability/  logger.config.ts metrics.* tracing.service.ts correlation*.ts
 test/             http.e2e.spec.ts
-docs/             RESPOSTAS-CONCEITUAIS.md
+docs/             RESPOSTAS-CONCEITUAIS.md  DESIGN-PATTERNS.md  ARCHITECTURE-DIAGRAM.md
 .specs/           planejamento spec-driven (PROJECT, STATE, spec, design, tasks)
 ```
 

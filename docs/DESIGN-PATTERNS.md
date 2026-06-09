@@ -1,5 +1,7 @@
 # Design Patterns — CaseCellShop Backend
 
+> 🔗 **Navegação:** [`../README.md`](../README.md) · [`ARCHITECTURE-DIAGRAM.md`](./ARCHITECTURE-DIAGRAM.md) (diagramas Mermaid) · [`RESPOSTAS-CONCEITUAIS.md`](./RESPOSTAS-CONCEITUAIS.md)
+
 > Documento técnico em PT-BR. Cada padrão é descrito com **evidência concreta** (arquivo:linha lida do código real), motivação no contexto do sistema de checkout assíncrono / estoque / fila, tradeoffs e benefícios. Ao final, uma seção crítica de padrões **deliberadamente não utilizados**, uma tabela-resumo e a conclusão.
 
 O sistema é um backend NestJS/TypeScript para uma loja de capinhas. O fluxo central é um **checkout assíncrono**: o request reserva estoque atomicamente, persiste o pedido `PENDING`, enfileira um job e responde `202 Accepted`; um worker fatura no "ERP" (fake) com retry/backoff e, ao esgotar tentativas, compensa o estoque (`FAILED`). Há ainda catálogo com cache, idempotência, reconciliação periódica e observabilidade.

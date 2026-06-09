@@ -1,0 +1,16 @@
+flowchart LR
+    REQ([GET /products]) --> GOL["CachePort.getOrLoad(key)"]
+    GOL --> HIT{"hit no cache?"}
+    HIT -- sim --> RET["retorna valor cacheado"]
+    HIT -- "miss" --> SF{"loader já em voo?<br/>(single-flight)"}
+    SF -- "sim" --> JOIN["aguarda a mesma execução<br/>(anti-stampede)"]
+    SF -- "não" --> LOAD["roda loader → repo (40ms)"]
+    LOAD --> OKL{"loader ok?"}
+    OKL -- sim --> SET["grava com TTL + jitter"] --> RET
+    OKL -- "não" --> STALE{"staleOnError?"}
+    STALE -- sim --> LAST["serve lastKnown (stale)"]
+    STALE -- "não" --> ERRO["propaga erro"]
+    JOIN --> RET
+
+    classDef ok fill:#d5f5e3,stroke:#27ae60,color:#145a32
+    class RET,SET ok
