@@ -6,3 +6,7 @@ coverage/
 .env.local
 .DS_Store
 *.tsbuildinfo
+
+# Tooling state / challenge brief (not part of the deliverable)
+.omc/
+*.pdf

@@ -23,17 +23,22 @@
 - PDF lido via `pdftotext` (Git for Windows): `C:\Program Files\Git\mingw64\bin\pdftotext.exe`.
 
 ## Todos
-- [ ] Scaffold NestJS + config (build/test verde)
-- [ ] Domínio: estoque/reserva + idempotência (puro, testado)
-- [ ] Ports + adapters (cache, queue, repo, erp)
-- [ ] Endpoints: GET /products, POST /checkout, GET /orders/:id/status
-- [ ] Observabilidade: pino + prom-client + spans
-- [ ] OpenAPI export
-- [ ] Testes: unit (domínio) + integração (cache hit/miss, overselling, idempotência)
-- [ ] docker-compose.yml + .env.example
-- [ ] RESPOSTAS-CONCEITUAIS.md (5 perguntas)
-- [ ] README + PROMPTS.md
-- [ ] git init + commits atômicos
+- [x] Scaffold NestJS + config (build/test verde)
+- [x] Domínio: estoque/reserva + idempotência (puro, testado)
+- [x] Ports + adapters (cache, queue, repo, erp)
+- [x] Endpoints: GET /products, POST /checkout, GET /orders/:id/status
+- [x] Observabilidade: pino + prom-client + spans
+- [x] OpenAPI export
+- [x] Testes: unit (domínio) + integração (cache hit/miss, overselling, idempotência) — 23/23 verdes
+- [x] docker-compose.yml + .env.example
+- [x] RESPOSTAS-CONCEITUAIS.md (5 perguntas)
+- [x] README + PROMPTS.md
+- [x] git init + commits atômicos
+- [x] Biome (lint+format) no lugar do ESLint
+
+## Status final
+Entrega completa: build compila, 23/23 testes verdes. Caminho Redis e2e (REDIS_E2E=1)
+fica adiado — requer Docker (B1). Publicação no GitHub fica a cargo do usuário (D4).
 
 ## Deferred Ideas
 - Teste e2e real contra Redis em CI (GitHub Actions com service redis).
