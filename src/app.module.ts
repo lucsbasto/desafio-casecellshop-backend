@@ -2,7 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { LoggerModule } from 'nestjs-pino';
 import { ApplicationModule } from './application/application.module';
-import { loadConfig } from './infrastructure/config/app-config';
+import { APP_CONFIG, AppConfig } from './infrastructure/config/app-config';
 import { AdminController } from './interface/http/controllers/admin.controller';
 import { CheckoutController } from './interface/http/controllers/checkout.controller';
 import { HealthController } from './interface/http/controllers/health.controller';
@@ -12,11 +12,13 @@ import { CorrelationMiddleware } from './observability/correlation.middleware';
 import { buildLoggerParams } from './observability/logger.config';
 import { ObservabilityModule } from './observability/observability.module';
 
-const cfg = loadConfig();
-
 @Module({
   imports: [
-    LoggerModule.forRoot(buildLoggerParams(cfg.serviceName, cfg.logLevel, cfg.env)),
+    // Reuse the single APP_CONFIG from the DI container (avoids a second loadConfig()).
+    LoggerModule.forRootAsync({
+      inject: [APP_CONFIG],
+      useFactory: (cfg: AppConfig) => buildLoggerParams(cfg.serviceName, cfg.logLevel, cfg.env),
+    }),
     ScheduleModule.forRoot(),
     ObservabilityModule,
     ApplicationModule,

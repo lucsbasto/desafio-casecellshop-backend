@@ -13,11 +13,14 @@ export function buildLoggerParams(serviceName: string, level: string, env: strin
     pinoHttp: {
       level,
       base: { service: serviceName },
-      // Generates/propagates the correlationId and exposes it in the response header.
+      // Single source of truth for the correlationId. If the middleware already
+      // set req.id, reuse it; otherwise read the header or mint a new UUID. This
+      // keeps logs and the response header aligned regardless of execution order.
       genReqId: (req: IncomingMessage, res: ServerResponse): string => {
-        const incoming = (req.headers[CORRELATION_HEADER] as string) || randomUUID();
-        res.setHeader(CORRELATION_HEADER, incoming);
-        return incoming;
+        const existing = (req as IncomingMessage & { id?: string }).id;
+        const id = existing || (req.headers[CORRELATION_HEADER] as string) || randomUUID();
+        res.setHeader(CORRELATION_HEADER, id);
+        return id;
       },
       customProps: (req: IncomingMessage) => ({
         correlationId: (req as IncomingMessage & { id?: string }).id,

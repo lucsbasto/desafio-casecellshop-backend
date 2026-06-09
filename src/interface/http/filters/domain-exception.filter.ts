@@ -65,10 +65,13 @@ export class DomainExceptionFilter implements ExceptionFilter {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
       error = 'INTERNAL_ERROR';
       message = 'Erro interno inesperado';
-      this.logger.error(
-        `Erro não tratado: ${(exception as Error)?.message}`,
-        (exception as Error)?.stack,
-      );
+      // Non-Error throws (e.g. `throw { ... }`) have no .stack; serialize them so
+      // the log keeps useful context instead of `undefined`.
+      if (exception instanceof Error) {
+        this.logger.error(`Erro não tratado: ${exception.message}`, exception.stack);
+      } else {
+        this.logger.error(`Erro não tratado (não-Error): ${JSON.stringify(exception)}`);
+      }
     }
 
     const payload: ErrorDto = {
