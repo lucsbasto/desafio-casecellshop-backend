@@ -1,5 +1,5 @@
 import { ReserveOutcome, StockPort } from '../../application/ports/stock.port';
-import { tryReserve, release } from '../../domain/stock';
+import { release, tryReserve } from '../../domain/stock';
 
 /**
  * In-memory stock. Node is single-threaded: each `reserve` executes synchronously

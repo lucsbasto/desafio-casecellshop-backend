@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
-import { ReconcileUseCase } from './use-cases/reconcile.usecase';
 import { APP_CONFIG, AppConfig } from '../infrastructure/config/app-config';
+import { ReconcileUseCase } from './use-cases/reconcile.usecase';
 
 /**
  * Triggers reconciliation periodically (FR-11). Disabled in test environments

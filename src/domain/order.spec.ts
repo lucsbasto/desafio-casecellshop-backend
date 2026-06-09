@@ -1,11 +1,5 @@
-import {
-  Order,
-  OrderStatus,
-  canTransition,
-  isTerminal,
-  transition,
-} from './order';
 import { InvalidOrderTransitionError } from './errors';
+import { canTransition, isTerminal, Order, OrderStatus, transition } from './order';
 
 function makeOrder(status: OrderStatus): Order {
   const now = new Date().toISOString();
@@ -31,9 +25,9 @@ describe('Order state machine', () => {
   it('bloqueia transições inválidas (CONFIRMED é terminal)', () => {
     expect(canTransition(OrderStatus.CONFIRMED, OrderStatus.PROCESSING)).toBe(false);
     const confirmed = makeOrder(OrderStatus.CONFIRMED);
-    expect(() =>
-      transition(confirmed, OrderStatus.PROCESSING, new Date().toISOString()),
-    ).toThrow(InvalidOrderTransitionError);
+    expect(() => transition(confirmed, OrderStatus.PROCESSING, new Date().toISOString())).toThrow(
+      InvalidOrderTransitionError,
+    );
   });
 
   it('transição é idempotente quando já está no destino', () => {

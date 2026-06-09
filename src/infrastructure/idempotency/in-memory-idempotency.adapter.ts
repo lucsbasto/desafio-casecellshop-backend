@@ -1,7 +1,4 @@
-import {
-  IdempotencyPort,
-  IdempotencyRecord,
-} from '../../application/ports/idempotency.port';
+import { IdempotencyPort, IdempotencyRecord } from '../../application/ports/idempotency.port';
 
 interface Stored {
   orderId: string;
@@ -15,11 +12,7 @@ interface Stored {
 export class InMemoryIdempotencyAdapter implements IdempotencyPort {
   private readonly store = new Map<string, Stored>();
 
-  async remember(
-    key: string,
-    orderId: string,
-    ttlMs: number,
-  ): Promise<IdempotencyRecord> {
+  async remember(key: string, orderId: string, ttlMs: number): Promise<IdempotencyRecord> {
     const now = Date.now();
     const existing = this.store.get(key);
     if (existing && existing.expiresAt > now) {

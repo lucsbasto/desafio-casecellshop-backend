@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { DuplicateRequestError } from '../../../application/use-cases/checkout.usecase';
 import {
   DomainError,
   InsufficientStockError,
@@ -14,7 +15,6 @@ import {
   OrderNotFoundError,
   ProductNotFoundError,
 } from '../../../domain/errors';
-import { DuplicateRequestError } from '../../../application/use-cases/checkout.usecase';
 import { getCorrelationId } from '../../../observability/correlation';
 import { ErrorDto } from '../dto/error.dto';
 
@@ -54,9 +54,9 @@ export class DomainExceptionFilter implements ExceptionFilter {
       message =
         typeof body === 'string'
           ? body
-          : (Array.isArray((body as { message?: unknown }).message)
-              ? ((body as { message: string[] }).message.join('; '))
-              : ((body as { message?: string }).message ?? exception.message));
+          : Array.isArray((body as { message?: unknown }).message)
+            ? (body as { message: string[] }).message.join('; ')
+            : ((body as { message?: string }).message ?? exception.message);
     } else if (exception instanceof DomainError || exception instanceof DuplicateRequestError) {
       statusCode = statusFor(exception);
       error = (exception as DomainError).code ?? exception.name;

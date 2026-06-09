@@ -1,4 +1,4 @@
-import { Provider, Logger } from '@nestjs/common';
+import { Logger, Provider } from '@nestjs/common';
 import IORedis, { Redis } from 'ioredis';
 import { APP_CONFIG, AppConfig } from './config/app-config';
 

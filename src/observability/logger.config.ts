@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import type { Params } from 'nestjs-pino';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Params } from 'nestjs-pino';
 import { CORRELATION_HEADER } from './correlation';
 
 /**
@@ -24,8 +24,7 @@ export function buildLoggerParams(serviceName: string, level: string, env: strin
       }),
       // Reduces noise: health/metrics endpoints do not need request logging.
       autoLogging: {
-        ignore: (req: IncomingMessage) =>
-          req.url === '/metrics' || req.url === '/health',
+        ignore: (req: IncomingMessage) => req.url === '/metrics' || req.url === '/health',
       },
       serializers: {
         req: (req: { method: string; url: string }) => ({

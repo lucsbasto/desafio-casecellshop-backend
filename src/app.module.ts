@@ -1,18 +1,16 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { LoggerModule } from 'nestjs-pino';
 import { ScheduleModule } from '@nestjs/schedule';
-
-import { ObservabilityModule } from './observability/observability.module';
+import { LoggerModule } from 'nestjs-pino';
 import { ApplicationModule } from './application/application.module';
+import { loadConfig } from './infrastructure/config/app-config';
+import { AdminController } from './interface/http/controllers/admin.controller';
+import { CheckoutController } from './interface/http/controllers/checkout.controller';
+import { HealthController } from './interface/http/controllers/health.controller';
+import { OrdersController } from './interface/http/controllers/orders.controller';
+import { ProductsController } from './interface/http/controllers/products.controller';
 import { CorrelationMiddleware } from './observability/correlation.middleware';
 import { buildLoggerParams } from './observability/logger.config';
-import { loadConfig } from './infrastructure/config/app-config';
-
-import { ProductsController } from './interface/http/controllers/products.controller';
-import { CheckoutController } from './interface/http/controllers/checkout.controller';
-import { OrdersController } from './interface/http/controllers/orders.controller';
-import { AdminController } from './interface/http/controllers/admin.controller';
-import { HealthController } from './interface/http/controllers/health.controller';
+import { ObservabilityModule } from './observability/observability.module';
 
 const cfg = loadConfig();
 

@@ -1,11 +1,11 @@
 import 'reflect-metadata';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { Logger as PinoLogger } from 'nestjs-pino';
-import { Logger, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { loadConfig } from './infrastructure/config/app-config';
 import { DomainExceptionFilter } from './interface/http/filters/domain-exception.filter';
 import { setupSwagger } from './swagger';
-import { loadConfig } from './infrastructure/config/app-config';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });

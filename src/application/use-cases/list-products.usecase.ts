@@ -1,14 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { CACHE_PORT, CachePort } from '../ports/cache.port';
-import {
-  PRODUCT_REPO_PORT,
-  ProductRepositoryPort,
-} from '../ports/repository.port';
 import { ProductNotFoundError } from '../../domain/errors';
 import { ProductView, toProductView } from '../../domain/product';
+import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
 import { MetricsService } from '../../observability/metrics.service';
 import { TracingService } from '../../observability/tracing.service';
-import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
+import { CACHE_PORT, CachePort } from '../ports/cache.port';
+import { PRODUCT_REPO_PORT, ProductRepositoryPort } from '../ports/repository.port';
 
 const ALL_KEY = 'products:all';
 const ONE_KEY = (id: string) => `products:${id}`;

@@ -1,8 +1,5 @@
 import type { Redis } from 'ioredis';
-import {
-  IdempotencyPort,
-  IdempotencyRecord,
-} from '../../application/ports/idempotency.port';
+import { IdempotencyPort, IdempotencyRecord } from '../../application/ports/idempotency.port';
 
 const KEY = (key: string) => `idem:${key}`;
 
@@ -14,18 +11,8 @@ const KEY = (key: string) => `idem:${key}`;
 export class RedisIdempotencyAdapter implements IdempotencyPort {
   constructor(private readonly redis: Redis) {}
 
-  async remember(
-    key: string,
-    orderId: string,
-    ttlMs: number,
-  ): Promise<IdempotencyRecord> {
-    const ok = await this.redis.set(
-      KEY(key),
-      orderId,
-      'PX',
-      Math.max(1, ttlMs),
-      'NX',
-    );
+  async remember(key: string, orderId: string, ttlMs: number): Promise<IdempotencyRecord> {
+    const ok = await this.redis.set(KEY(key), orderId, 'PX', Math.max(1, ttlMs), 'NX');
     if (ok === 'OK') {
       return { orderId, created: true };
     }

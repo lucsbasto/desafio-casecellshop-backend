@@ -1,13 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { QUEUE_PORT, QueuePort } from '../ports/queue.port';
-import {
-  ORDER_REPO_PORT,
-  OrderRepositoryPort,
-} from '../ports/repository.port';
-import { STOCK_PORT, StockPort } from '../ports/stock.port';
 import { OrderStatus, transition } from '../../domain/order';
 import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
 import { MetricsService } from '../../observability/metrics.service';
+import { QUEUE_PORT, QueuePort } from '../ports/queue.port';
+import { ORDER_REPO_PORT, OrderRepositoryPort } from '../ports/repository.port';
+import { STOCK_PORT, StockPort } from '../ports/stock.port';
 
 export interface ReconcileReport {
   requeued: number;

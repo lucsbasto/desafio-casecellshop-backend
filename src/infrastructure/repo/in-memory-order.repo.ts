@@ -18,11 +18,7 @@ export class InMemoryOrderRepository implements OrderRepositoryPort {
   async findPendingOlderThan(before: Date): Promise<Order[]> {
     const cutoff = before.getTime();
     return [...this.orders.values()]
-      .filter(
-        (o) =>
-          o.status === OrderStatus.PENDING &&
-          new Date(o.createdAt).getTime() < cutoff,
-      )
+      .filter((o) => o.status === OrderStatus.PENDING && new Date(o.createdAt).getTime() < cutoff)
       .map((o) => structuredClone(o));
   }
 }

@@ -10,9 +10,7 @@ describe('Reserva de estoque sob concorrência', () => {
     await stock.init('CAPA-X', 10);
 
     const N = 50;
-    const results = await Promise.all(
-      Array.from({ length: N }, () => stock.reserve('CAPA-X', 1)),
-    );
+    const results = await Promise.all(Array.from({ length: N }, () => stock.reserve('CAPA-X', 1)));
 
     const success = results.filter((r) => r.ok).length;
     const failed = results.filter((r) => !r.ok).length;

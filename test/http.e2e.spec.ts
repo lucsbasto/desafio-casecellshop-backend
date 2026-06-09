@@ -2,9 +2,9 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { DomainExceptionFilter } from '../src/interface/http/filters/domain-exception.filter';
 import { QUEUE_PORT } from '../src/application/ports/queue.port';
 import { InMemoryQueueAdapter } from '../src/infrastructure/queue/in-memory-queue.adapter';
+import { DomainExceptionFilter } from '../src/interface/http/filters/domain-exception.filter';
 
 /**
  * HTTP contract E2E tests. Runs 100% in-memory (no Docker): NODE_ENV=test and

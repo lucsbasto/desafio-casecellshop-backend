@@ -1,8 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { ApiOkResponse, ApiNotFoundResponse, ApiTags } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { GetOrderStatusUseCase } from '../../../application/use-cases/get-order-status.usecase';
-import { OrderStatusDto } from '../dto/order.dto';
 import { ErrorDto } from '../dto/error.dto';
+import { OrderStatusDto } from '../dto/order.dto';
 
 @ApiTags('orders')
 @Controller('orders')

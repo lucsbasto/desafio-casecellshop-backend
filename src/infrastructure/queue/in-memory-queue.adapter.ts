@@ -1,8 +1,4 @@
-import {
-  CheckoutJob,
-  QueuePort,
-  QueueProcessor,
-} from '../../application/ports/queue.port';
+import { CheckoutJob, QueuePort, QueueProcessor } from '../../application/ports/queue.port';
 
 export interface InMemoryQueueOptions {
   maxAttempts: number;
@@ -26,7 +22,6 @@ interface QueuedJob {
  */
 export class InMemoryQueueAdapter implements QueuePort {
   private processor?: QueueProcessor;
-  private inFlight = 0;
   private pending = 0;
   private readonly settled: Array<Promise<void>> = [];
 
@@ -44,22 +39,19 @@ export class InMemoryQueueAdapter implements QueuePort {
 
   private async run(queued: QueuedJob): Promise<void> {
     if (!this.processor) throw new Error('Nenhum processador registrado na fila');
-    this.inFlight++;
     try {
       await this.processor.process(queued.job, queued.attempt);
     } catch (err) {
       const error = err as Error;
       if (queued.attempt < this.opts.maxAttempts) {
         const factor = this.opts.backoffFactor ?? 2;
-        const delay = this.opts.backoffMs * Math.pow(factor, queued.attempt - 1);
+        const delay = this.opts.backoffMs * factor ** (queued.attempt - 1);
         await this.sleep(delay);
         await this.run({ job: queued.job, attempt: queued.attempt + 1 });
       } else {
         // Attempts exhausted: compensation / dead-letter.
         await this.processor.onExhausted(queued.job, error);
       }
-    } finally {
-      this.inFlight--;
     }
   }
 

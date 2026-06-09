@@ -1,20 +1,12 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ERP_PORT, ErpPort } from '../ports/erp.port';
-import {
-  QUEUE_PORT,
-  QueuePort,
-  QueueProcessor,
-  CheckoutJob,
-} from '../ports/queue.port';
-import {
-  ORDER_REPO_PORT,
-  OrderRepositoryPort,
-} from '../ports/repository.port';
-import { STOCK_PORT, StockPort } from '../ports/stock.port';
-import { Order, OrderStatus, isTerminal, transition } from '../../domain/order';
+import { isTerminal, Order, OrderStatus, transition } from '../../domain/order';
+import { runWithCorrelation } from '../../observability/correlation';
 import { MetricsService } from '../../observability/metrics.service';
 import { TracingService } from '../../observability/tracing.service';
-import { runWithCorrelation } from '../../observability/correlation';
+import { ERP_PORT, ErpPort } from '../ports/erp.port';
+import { CheckoutJob, QUEUE_PORT, QueuePort, QueueProcessor } from '../ports/queue.port';
+import { ORDER_REPO_PORT, OrderRepositoryPort } from '../ports/repository.port';
+import { STOCK_PORT, StockPort } from '../ports/stock.port';
 
 /**
  * Async checkout worker. Idempotent: ignores already-terminal or non-existent orders.
@@ -44,11 +36,10 @@ export class CheckoutWorker implements QueueProcessor, OnModuleInit {
       async () => {
         const endTimer = this.metrics.workerDuration.startTimer();
         try {
-          await this.tracing.withSpan(
-            'worker.process',
-            () => this.handle(job, attempt),
-            { orderId: job.orderId, attempt },
-          );
+          await this.tracing.withSpan('worker.process', () => this.handle(job, attempt), {
+            orderId: job.orderId,
+            attempt,
+          });
         } finally {
           endTimer();
           this.metrics.queueDepth.set(await this.queue.depth());
@@ -117,9 +108,7 @@ export class CheckoutWorker implements QueueProcessor, OnModuleInit {
           await this.stock.release(item.productId, item.quantity);
         }
         this.metrics.workerJobs.inc({ result: 'failed' });
-        this.logger.error(
-          `Pedido ${order.id} FAILED após esgotar tentativas; estoque compensado`,
-        );
+        this.logger.error(`Pedido ${order.id} FAILED após esgotar tentativas; estoque compensado`);
       },
     );
   }

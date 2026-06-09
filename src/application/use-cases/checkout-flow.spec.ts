@@ -1,18 +1,18 @@
-import { CheckoutUseCase } from './checkout.usecase';
-import { CheckoutWorker } from './checkout.worker';
-import { GetOrderStatusUseCase } from './get-order-status.usecase';
-import { OrderStatus } from '../../domain/order';
 import { InsufficientStockError } from '../../domain/errors';
-import { MetricsService } from '../../observability/metrics.service';
-import { TracingService } from '../../observability/tracing.service';
+import { OrderStatus } from '../../domain/order';
+import { Product } from '../../domain/product';
 import { AppConfig } from '../../infrastructure/config/app-config';
-import { InMemoryStockAdapter } from '../../infrastructure/stock/in-memory-stock.adapter';
+import { FakeErpClient } from '../../infrastructure/erp/fake-erp.client';
 import { InMemoryIdempotencyAdapter } from '../../infrastructure/idempotency/in-memory-idempotency.adapter';
 import { InMemoryQueueAdapter } from '../../infrastructure/queue/in-memory-queue.adapter';
 import { InMemoryOrderRepository } from '../../infrastructure/repo/in-memory-order.repo';
 import { InMemoryProductRepository } from '../../infrastructure/repo/in-memory-product.repo';
-import { FakeErpClient } from '../../infrastructure/erp/fake-erp.client';
-import { Product } from '../../domain/product';
+import { InMemoryStockAdapter } from '../../infrastructure/stock/in-memory-stock.adapter';
+import { MetricsService } from '../../observability/metrics.service';
+import { TracingService } from '../../observability/tracing.service';
+import { CheckoutUseCase } from './checkout.usecase';
+import { CheckoutWorker } from './checkout.worker';
+import { GetOrderStatusUseCase } from './get-order-status.usecase';
 
 const baseConfig = (over: Partial<AppConfig['worker']> = {}): AppConfig => ({
   port: 0,
@@ -28,11 +28,7 @@ const baseConfig = (over: Partial<AppConfig['worker']> = {}): AppConfig => ({
   idempotencyTtlMs: 60000,
 });
 
-async function buildHarness(opts: {
-  seed: Product[];
-  erpFailRate: number;
-  maxAttempts?: number;
-}) {
+async function buildHarness(opts: { seed: Product[]; erpFailRate: number; maxAttempts?: number }) {
   const config = baseConfig({ maxAttempts: opts.maxAttempts ?? 3 });
   const metrics = new MetricsService();
   const tracing = new TracingService();
@@ -52,7 +48,14 @@ async function buildHarness(opts: {
   });
 
   const checkout = new CheckoutUseCase(
-    stock, idempotency, queue, orders, products, config, metrics, tracing,
+    stock,
+    idempotency,
+    queue,
+    orders,
+    products,
+    config,
+    metrics,
+    tracing,
   );
   const worker = new CheckoutWorker(queue, erp, orders, stock, metrics, tracing);
   worker.onModuleInit(); // registra na fila
@@ -61,9 +64,7 @@ async function buildHarness(opts: {
   return { checkout, queue, getStatus, stock, metrics };
 }
 
-const SEED: Product[] = [
-  { id: 'CAPA-001', name: 'Capa A', priceCents: 1000, stock: 2 },
-];
+const SEED: Product[] = [{ id: 'CAPA-001', name: 'Capa A', priceCents: 1000, stock: 2 }];
 
 describe('Fluxo de checkout assíncrono', () => {
   it('happy path: 202 PENDING -> worker -> CONFIRMED, estoque debitado', async () => {

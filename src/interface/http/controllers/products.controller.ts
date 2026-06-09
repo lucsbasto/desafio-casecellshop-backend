@@ -1,8 +1,8 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { ApiOkResponse, ApiNotFoundResponse, ApiTags } from '@nestjs/swagger';
+import { ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ListProductsUseCase } from '../../../application/use-cases/list-products.usecase';
-import { ProductDto } from '../dto/product.dto';
 import { ErrorDto } from '../dto/error.dto';
+import { ProductDto } from '../dto/product.dto';
 
 @ApiTags('catalog')
 @Controller('products')

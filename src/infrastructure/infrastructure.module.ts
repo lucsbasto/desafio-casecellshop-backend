@@ -1,11 +1,7 @@
-import { Global, Module, Provider, Logger, OnModuleInit, Inject } from '@nestjs/common';
+import { Global, Inject, Logger, Module, OnModuleInit, Provider } from '@nestjs/common';
 import type { Redis } from 'ioredis';
-
-import { APP_CONFIG, AppConfig, loadConfig } from './config/app-config';
-import { REDIS_CLIENT, RedisProvider } from './redis.provider';
-
 import { CACHE_PORT } from '../application/ports/cache.port';
-import { STOCK_PORT, StockPort } from '../application/ports/stock.port';
+import { ERP_PORT } from '../application/ports/erp.port';
 import { IDEMPOTENCY_PORT } from '../application/ports/idempotency.port';
 import { QUEUE_PORT } from '../application/ports/queue.port';
 import {
@@ -13,19 +9,20 @@ import {
   PRODUCT_REPO_PORT,
   ProductRepositoryPort,
 } from '../application/ports/repository.port';
-import { ERP_PORT } from '../application/ports/erp.port';
-
+import { STOCK_PORT, StockPort } from '../application/ports/stock.port';
 import { InMemoryCacheAdapter } from './cache/in-memory-cache.adapter';
 import { RedisCacheAdapter } from './cache/redis-cache.adapter';
-import { InMemoryStockAdapter } from './stock/in-memory-stock.adapter';
-import { RedisStockAdapter } from './stock/redis-stock.adapter';
+import { APP_CONFIG, AppConfig, loadConfig } from './config/app-config';
+import { FakeErpClient } from './erp/fake-erp.client';
 import { InMemoryIdempotencyAdapter } from './idempotency/in-memory-idempotency.adapter';
 import { RedisIdempotencyAdapter } from './idempotency/redis-idempotency.adapter';
-import { InMemoryQueueAdapter } from './queue/in-memory-queue.adapter';
 import { BullMqQueueAdapter } from './queue/bullmq-queue.adapter';
-import { InMemoryProductRepository } from './repo/in-memory-product.repo';
+import { InMemoryQueueAdapter } from './queue/in-memory-queue.adapter';
+import { REDIS_CLIENT, RedisProvider } from './redis.provider';
 import { InMemoryOrderRepository } from './repo/in-memory-order.repo';
-import { FakeErpClient } from './erp/fake-erp.client';
+import { InMemoryProductRepository } from './repo/in-memory-product.repo';
+import { InMemoryStockAdapter } from './stock/in-memory-stock.adapter';
+import { RedisStockAdapter } from './stock/redis-stock.adapter';
 
 const requireRedis = (redis: Redis | null): Redis => {
   if (!redis) throw new Error('Driver=redis selecionado mas a conexão Redis é nula');

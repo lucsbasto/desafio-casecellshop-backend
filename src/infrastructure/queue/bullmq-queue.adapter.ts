@@ -1,9 +1,5 @@
-import { Queue, Worker, Job, QueueEvents, ConnectionOptions } from 'bullmq';
-import {
-  CheckoutJob,
-  QueuePort,
-  QueueProcessor,
-} from '../../application/ports/queue.port';
+import { ConnectionOptions, Job, Queue, QueueEvents, Worker } from 'bullmq';
+import { CheckoutJob, QueuePort, QueueProcessor } from '../../application/ports/queue.port';
 
 const QUEUE_NAME = 'checkout';
 

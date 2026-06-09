@@ -1,10 +1,12 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { STOCK_PORT, StockPort } from '../ports/stock.port';
-import {
-  IDEMPOTENCY_PORT,
-  IdempotencyPort,
-} from '../ports/idempotency.port';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { InsufficientStockError, ProductNotFoundError } from '../../domain/errors';
+import { Order, OrderItem, OrderStatus } from '../../domain/order';
+import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
+import { setOrderId } from '../../observability/correlation';
+import { MetricsService } from '../../observability/metrics.service';
+import { TracingService } from '../../observability/tracing.service';
+import { IDEMPOTENCY_PORT, IdempotencyPort } from '../ports/idempotency.port';
 import { QUEUE_PORT, QueuePort } from '../ports/queue.port';
 import {
   ORDER_REPO_PORT,
@@ -12,15 +14,7 @@ import {
   PRODUCT_REPO_PORT,
   ProductRepositoryPort,
 } from '../ports/repository.port';
-import { Order, OrderItem, OrderStatus } from '../../domain/order';
-import {
-  InsufficientStockError,
-  ProductNotFoundError,
-} from '../../domain/errors';
-import { MetricsService } from '../../observability/metrics.service';
-import { TracingService } from '../../observability/tracing.service';
-import { setOrderId } from '../../observability/correlation';
-import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
+import { STOCK_PORT, StockPort } from '../ports/stock.port';
 
 export interface CheckoutInput {
   items: OrderItem[];
