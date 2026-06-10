@@ -1,11 +1,12 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ProductNotFoundError } from '../../domain/errors';
-import { ProductView, toProductView } from '../../domain/product';
+import { Product, ProductView, toProductView } from '../../domain/product';
 import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
 import { MetricsService } from '../../observability/metrics.service';
 import { TracingService } from '../../observability/tracing.service';
 import { CACHE_PORT, CachePort } from '../ports/cache.port';
 import { PRODUCT_REPO_PORT, ProductRepositoryPort } from '../ports/repository.port';
+import { STOCK_PORT, StockPort } from '../ports/stock.port';
 
 const ALL_KEY = 'products:all';
 const ONE_KEY = (id: string) => `products:${id}`;
@@ -13,12 +14,20 @@ const ONE_KEY = (id: string) => `products:${id}`;
 /**
  * Storefront: reads products via cache-aside (TTL + single-flight) over the "fake ERP".
  * Records cache hit/miss and serves stale on ERP failure (fallback).
+ *
+ * Availability is intentionally NOT taken from the cached catalog snapshot: the
+ * slow/immutable catalog (name/price) is cached, but `stock` is overlaid LIVE from
+ * the reservation ledger (StockPort) on every read. This prevents the storefront
+ * from advertising stock that has already been reserved/sold (stale availability)
+ * and makes releases (failed orders) visible immediately — without weakening the
+ * cache gain on the expensive catalog fetch.
  */
 @Injectable()
 export class ListProductsUseCase {
   constructor(
     @Inject(CACHE_PORT) private readonly cache: CachePort,
     @Inject(PRODUCT_REPO_PORT) private readonly repo: ProductRepositoryPort,
+    @Inject(STOCK_PORT) private readonly stock: StockPort,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     private readonly metrics: MetricsService,
     private readonly tracing: TracingService,
@@ -42,7 +51,7 @@ export class ListProductsUseCase {
     );
     span.end({ hit, stale });
     this.metrics.cacheRequests.inc({ result: stale ? 'stale' : hit ? 'hit' : 'miss' });
-    return value.map(toProductView);
+    return Promise.all(value.map((p) => this.withLiveStock(p)));
   }
 
   async getById(id: string): Promise<ProductView> {
@@ -54,6 +63,12 @@ export class ListProductsUseCase {
     );
     this.metrics.cacheRequests.inc({ result: stale ? 'stale' : hit ? 'hit' : 'miss' });
     if (!value) throw new ProductNotFoundError(id);
-    return toProductView(value);
+    return this.withLiveStock(value);
+  }
+
+  /** Overlays the live reservation-ledger balance onto a cached catalog entry. */
+  private async withLiveStock(product: Product): Promise<ProductView> {
+    const stock = await this.stock.get(product.id);
+    return toProductView({ ...product, stock });
   }
 }
