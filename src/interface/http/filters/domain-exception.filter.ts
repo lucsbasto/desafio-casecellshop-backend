@@ -7,9 +7,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
-import { DuplicateRequestError } from '../../../application/use-cases/checkout.usecase';
 import {
   DomainError,
+  DuplicateRequestError,
   InsufficientStockError,
   InvalidOrderTransitionError,
   OrderNotFoundError,
@@ -57,10 +57,10 @@ export class DomainExceptionFilter implements ExceptionFilter {
           : Array.isArray((body as { message?: unknown }).message)
             ? (body as { message: string[] }).message.join('; ')
             : ((body as { message?: string }).message ?? exception.message);
-    } else if (exception instanceof DomainError || exception instanceof DuplicateRequestError) {
+    } else if (exception instanceof DomainError) {
       statusCode = statusFor(exception);
-      error = (exception as DomainError).code ?? exception.name;
-      message = (exception as Error).message;
+      error = exception.code;
+      message = exception.message;
     } else {
       statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
       error = 'INTERNAL_ERROR';

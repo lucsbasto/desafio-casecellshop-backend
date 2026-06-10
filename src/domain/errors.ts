@@ -39,3 +39,10 @@ export class InvalidOrderTransitionError extends DomainError {
     super(`Transição de status inválida: ${from} -> ${to}`, 'INVALID_ORDER_TRANSITION');
   }
 }
+
+/** Replay of an idempotency key whose original attempt never persisted the order. -> HTTP 409 */
+export class DuplicateRequestError extends DomainError {
+  constructor() {
+    super('Requisição duplicada cuja tentativa original não foi concluída', 'DUPLICATE_REQUEST');
+  }
+}

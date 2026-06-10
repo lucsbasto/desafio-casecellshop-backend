@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { InsufficientStockError, ProductNotFoundError } from '../../domain/errors';
+import {
+  DuplicateRequestError,
+  InsufficientStockError,
+  ProductNotFoundError,
+} from '../../domain/errors';
 import { Order, OrderItem, OrderStatus } from '../../domain/order';
 import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
 import { setOrderId } from '../../observability/correlation';
@@ -25,14 +29,6 @@ export interface CheckoutInput {
 export interface CheckoutOutput {
   order: Order;
   replay: boolean;
-}
-
-/** Replay error whose original attempt never created the order. -> 409 */
-export class DuplicateRequestError extends Error {
-  readonly code = 'DUPLICATE_REQUEST';
-  constructor() {
-    super('Requisição duplicada cuja tentativa original não foi concluída');
-  }
 }
 
 /**
