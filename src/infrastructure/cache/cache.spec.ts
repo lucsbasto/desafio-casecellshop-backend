@@ -134,3 +134,108 @@ describe('RedisCacheAdapter TTL jitter', () => {
     expect(sink.px).toBe(1000);
   });
 });
+
+describe('RedisCacheAdapter getOrLoad', () => {
+  // Fake Redis backed by an in-memory Map, mirroring the get/set/del contract the
+  // adapter relies on (set serializes JSON; get returns the raw string or null).
+  const fakeRedis = () => {
+    const data = new Map<string, string>();
+    return {
+      get: (async (key: string) => data.get(key) ?? null) as Redis['get'],
+      set: (async (key: string, val: string) => {
+        data.set(key, val);
+        return 'OK';
+      }) as Redis['set'],
+      del: (async (key: string) => (data.delete(key) ? 1 : 0)) as Redis['del'],
+    } as unknown as Redis;
+  };
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('miss: roda o loader uma vez e armazena o valor', async () => {
+    const cache = new RedisCacheAdapter(fakeRedis());
+    let loads = 0;
+    const loader = async () => {
+      loads++;
+      return { v: 42 };
+    };
+
+    const res = await cache.getOrLoad('k', 1000, loader);
+
+    expect(res.hit).toBe(false);
+    expect(res.stale).toBe(false);
+    expect(res.value).toEqual({ v: 42 });
+    expect(loads).toBe(1);
+    expect(await cache.get('k')).toEqual({ v: 42 });
+  });
+
+  it('2ª chamada é hit (sem rodar o loader)', async () => {
+    const cache = new RedisCacheAdapter(fakeRedis());
+    let loads = 0;
+    const loader = async () => {
+      loads++;
+      return { v: 42 };
+    };
+
+    const first = await cache.getOrLoad('k', 1000, loader);
+    const second = await cache.getOrLoad('k', 1000, loader);
+
+    expect(first.hit).toBe(false);
+    expect(second.hit).toBe(true);
+    expect(second.value).toEqual({ v: 42 });
+    expect(loads).toBe(1);
+  });
+
+  it('single-flight: misses concorrentes disparam o loader uma única vez (anti-stampede)', async () => {
+    const cache = new RedisCacheAdapter(fakeRedis());
+    let loads = 0;
+    const loader = async () => {
+      loads++;
+      await new Promise((r) => setTimeout(r, 20));
+      return 'value';
+    };
+
+    const pending = Promise.all(
+      Array.from({ length: 20 }, () => cache.getOrLoad('hot', 1000, loader)),
+    );
+    await jest.advanceTimersByTimeAsync(20); // libera o setTimeout do loader
+    const results = await pending;
+
+    expect(loads).toBe(1); // stampede avoided
+    expect(results.every((r) => r.value === 'value')).toBe(true);
+  });
+
+  it('fallback stale-while-error serve o último valor bom quando o loader falha', async () => {
+    const cache = new RedisCacheAdapter(fakeRedis(), { jitterRatio: 0 });
+    await cache.set('k', 'bom', 1000); // popula lastKnown
+    await cache.del('k'); // remove do storage, mas lastKnown permanece
+
+    const res = await cache.getOrLoad(
+      'k',
+      1000,
+      async () => {
+        throw new Error('ERP fora do ar');
+      },
+      { staleOnError: true },
+    );
+
+    expect(res.stale).toBe(true);
+    expect(res.value).toBe('bom');
+  });
+
+  it('rejeita quando o loader falha e não há valor anterior', async () => {
+    const cache = new RedisCacheAdapter(fakeRedis());
+
+    await expect(
+      cache.getOrLoad(
+        'k',
+        1000,
+        async () => {
+          throw new Error('ERP fora do ar');
+        },
+        { staleOnError: true },
+      ),
+    ).rejects.toThrow('ERP fora do ar');
+  });
+});

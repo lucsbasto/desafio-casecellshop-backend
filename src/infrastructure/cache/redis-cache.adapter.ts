@@ -1,22 +1,19 @@
 import type { Redis } from 'ioredis';
-import { CachePort } from '../../application/ports/cache.port';
-import { CacheJitterOptions, createJitter } from './cache-jitter';
+import { AbstractCacheAdapter } from './abstract-cache.adapter';
+import { CacheJitterOptions } from './cache-jitter';
 
 /**
- * Redis cache (cache-aside). In-process single-flight + proportional TTL jitter
- * mitigate stampede; for cross-instance coordination a short SET NX lock would be
- * used (referenced in the README). Keeps the last value for stale-while-error fallback.
+ * Redis cache (cache-aside). Inherits in-process single-flight, stale-while-error
+ * fallback and proportional TTL jitter from {@link AbstractCacheAdapter}; here it
+ * only owns the Redis-backed storage (JSON serialize + corrupted-value eviction).
+ * For cross-instance coordination a short SET NX lock would be used (see README).
  */
-export class RedisCacheAdapter implements CachePort {
-  private readonly inflight = new Map<string, Promise<unknown>>();
-  private readonly lastKnown = new Map<string, unknown>();
-  private readonly jitter: (ttlMs: number) => number;
-
+export class RedisCacheAdapter extends AbstractCacheAdapter {
   constructor(
     private readonly redis: Redis,
     options: CacheJitterOptions = {},
   ) {
-    this.jitter = createJitter(options);
+    super(options);
   }
 
   async get<T>(key: string): Promise<T | undefined> {
@@ -32,46 +29,11 @@ export class RedisCacheAdapter implements CachePort {
     }
   }
 
-  async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
-    await this.redis.set(key, JSON.stringify(value), 'PX', this.jitter(ttlMs));
-    this.lastKnown.set(key, value);
+  protected async writeStore<T>(key: string, value: T, jitteredTtlMs: number): Promise<void> {
+    await this.redis.set(key, JSON.stringify(value), 'PX', jitteredTtlMs);
   }
 
   async del(key: string): Promise<void> {
     await this.redis.del(key);
-  }
-
-  async getOrLoad<T>(
-    key: string,
-    ttlMs: number,
-    loader: () => Promise<T>,
-    opts: { staleOnError?: boolean } = {},
-  ): Promise<{ value: T; hit: boolean; stale: boolean }> {
-    const cached = await this.get<T>(key);
-    if (cached !== undefined) return { value: cached, hit: true, stale: false };
-
-    const existing = this.inflight.get(key);
-    if (existing) return { value: (await existing) as T, hit: true, stale: false };
-
-    const promise = (async () => {
-      try {
-        const value = await loader();
-        await this.set(key, value, ttlMs);
-        return value;
-      } finally {
-        this.inflight.delete(key);
-      }
-    })();
-    this.inflight.set(key, promise);
-
-    try {
-      const value = (await promise) as T;
-      return { value, hit: false, stale: false };
-    } catch (err) {
-      if (opts.staleOnError && this.lastKnown.has(key)) {
-        return { value: this.lastKnown.get(key) as T, hit: false, stale: true };
-      }
-      throw err;
-    }
   }
 }
