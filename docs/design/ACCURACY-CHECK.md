@@ -13,7 +13,8 @@
 
 **Veredito geral:** os documentos são **altamente fiéis ao código**. Nomes de métricas,
 tokens DI (`Symbol`), constantes Lua, chaves de config, mapeamento erro→HTTP, endpoints,
-máquina de estados e a contagem de 23 testes estão **corretos**. As divergências são, em
+máquina de estados estão **corretos** (a contagem de testes subiu de 23 para **26** após o
+refactor de cache — ver tabela). As divergências são, em
 sua maioria, **drift de número de linha** (o código evoluiu 1–2 linhas) e uma
 **imprecisão factual real**: a latência simulada do repositório é **40ms** (correto),
 mas o doc atribui esse 40ms ao "ERP", quando o ERP (FakeErpClient) na verdade usa
@@ -85,7 +86,7 @@ mas o doc atribui esse 40ms ao "ERP", quando o ERP (FakeErpClient) na verdade us
 | Single-flight in-memory `:49-54` | DESIGN §18 linha 250 | `in-memory-cache.adapter.ts:49-54` (mapa `inflight`) | ✅ confere | — |
 | Single-flight redis `:46-58` | DESIGN §18 linha 250 | `redis-cache.adapter.ts:46-58` | ✅ confere | — |
 | Stale-while-error in-memory `:70-76` | DESIGN §18 linha 251 | `in-memory-cache.adapter.ts:70-76` (`opts.staleOnError && lastKnown`) | ✅ confere | — |
-| TTL jitter em `list-products.usecase.ts:27-32` | DESIGN §18 linha 252 | `list-products.usecase.ts:27-32` `ttl()` com `Math.random()*stampedeJitterMs` | ✅ confere | — |
+| TTL jitter (espalha expirações) | DESIGN §18 linha 252 | Jitter aplicado no **adapter** — `cache-jitter.ts` `createJitter()`, modelo **proporcional** `[ttl, ttl*(1+ratio)]` (`ratio` clampado a `[0,1]`) com `stampedeJitterRatio` (default `DEFAULT_JITTER_RATIO=0.2`, `app-config.ts:53`); `redis-cache.adapter.ts:36`. O `ttl()` em `list-products.usecase.ts:31-33` passa o **TTL puro**. | ✅ confere | Doc-fonte (DESIGN §18 l.252) já descreve `cache-jitter.ts → createJitter()` + `stampedeJitterRatio`. |
 | `ListProductsUseCase.listAll()` em `:34-45` | DESIGN §18 linha 253 | `list-products.usecase.ts:34-45` | ✅ confere | — |
 | Comentário sobre lock cross-instance em `redis-cache.adapter.ts:5-8` | DESIGN §18 linha 257; §E | `redis-cache.adapter.ts:4-8` (comentário sobre `SET NX` cross-instance) | ✅ confere | — |
 | `ReconcileUseCase` em `reconcile.usecase.ts:21` | DESIGN §19 linha 265 | `reconcile.usecase.ts:21` `export class ReconcileUseCase` | ✅ confere | — |
@@ -114,7 +115,7 @@ mas o doc atribui esse 40ms ao "ERP", quando o ERP (FakeErpClient) na verdade us
 | Endpoint `GET /products` e `GET /products/:id` | ARCH §5; DESIGN §6 | `products.controller.ts:8,12,18` | ✅ confere | — |
 | Endpoint `GET /orders/:orderId/status` | DESIGN §21 (GetOrderStatus) | `orders.controller.ts:8,12` `@Get(':orderId/status')` | ✅ confere | — |
 | Métricas adicionais: `checkout_requests_total`, `worker_jobs_total`, `queue_depth`, `oversell_prevented_total`, `stock_reservation_total`, `erp_calls_total` | DESIGN §24 / conclusão | `metrics.service.ts:32-83` — todos presentes com esses nomes | ✅ confere | — |
-| Suite com **23 testes** | README/STATE (referenciado pelo contexto) | 23 ocorrências de `it/test` em 5 specs: `cache.spec.ts`(4), `stock-concurrency.spec.ts`(3), `order.spec.ts`(5), `checkout-flow.spec.ts`(4), `test/http.e2e.spec.ts`(7) = **23** | ✅ confere | — |
+| Suite de testes | README/STATE (referenciado pelo contexto) | **26** ocorrências de `it/test` em 5 specs: `cache.spec.ts`(7), `stock-concurrency.spec.ts`(3), `order.spec.ts`(5), `checkout-flow.spec.ts`(4), `test/http.e2e.spec.ts`(7) = **26** | ⚠️ atualizado | Eram 23 na época desta auditoria; `cache.spec.ts` cresceu 4→7 no refactor de TTL/jitter. README já atualizado para 26. |
 | `staleOnError` cobre caminho de leitura quando ERP cai | DESIGN §B linha 360 | `list-products.usecase.ts:41,53` `{ staleOnError: true }` | ✅ confere | — |
 | Compensação de estoque em 3 pontos | DESIGN §15 | checkout `:119-125`, worker.onExhausted `:100-123`, reconcile `:42-54` | ✅ confere | — |
 
@@ -174,7 +175,7 @@ precisão total, o nó poderia ser rotulado `ORDER_REPO_PORT / PRODUCT_REPO_PORT
   errar: nomes exatos das métricas Prometheus (todos batem), conteúdo dos scripts Lua
   (`RESERVE_LUA`/`REMEMBER_LUA`), o TTL de idempotência (24h = 86400000ms), o mapeamento
   erro→HTTP (404/409/500), o `@Interval(15000)`, o `concurrency: 4` do BullMQ, e a contagem
-  de 23 testes.
+  de testes (**26**, atualizada de 23).
 - O snippet de código embutido em DESIGN §3 (`StockProvider`) reproduz **fielmente** o
   `infrastructure.module.ts:43-50`.
 - Nenhuma afirmação sobre *padrões* (Hexagonal, DI, Strategy, State Machine, Outbox lógico,

@@ -54,7 +54,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 **Por que escolhemos:** a decisão "memory vs redis" é de runtime (variável de ambiente), não de compilação. A Factory encapsula essa lógica de seleção/instanciação num único lugar.
 
-**Tradeoffs:** factories crescem com o número de capabilities; `requireRedis()` (`:27-30`) precisa lançar erro quando o driver pede Redis mas a conexão é nula — um acoplamento implícito entre providers.
+**Tradeoffs:** factories crescem com o número de capabilities; `requireRedis()` (`infrastructure.module.ts:27-30`) precisa lançar erro quando o driver pede Redis mas a conexão é nula — um acoplamento implícito entre providers.
 
 **Pontos positivos:** um único ponto verdade para o wiring; rodar 100% em memória não instancia nenhum recurso Redis (sem Docker para o avaliador).
 
@@ -62,7 +62,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 4. Singleton (escopo padrão de providers Nest)
 **Categoria:** Criacional
-**Onde:** todos os `@Injectable()` e providers (default scope do Nest é singleton). Ex.: `MetricsService` (`src/observability/metrics.service.ts:8-9`) mantém um único `Registry` Prometheus compartilhado por toda a app; `TracingService` (`tracing.service.ts:26-27`) mantém um buffer único de spans; a conexão ioredis é singleton via `REDIS_CLIENT`.
+**Onde:** todos os `@Injectable()` e providers (default scope do Nest é singleton). Ex.: `MetricsService` (`src/observability/metrics.service.ts:10` → `registry`) mantém um único `Registry` Prometheus compartilhado por toda a app; `TracingService` (`tracing.service.ts:28-29` → `maxBuffer`/`finished`) mantém um buffer único de spans; a conexão ioredis é singleton via `REDIS_CLIENT`.
 
 **Por que escolhemos:** métricas, registry de tracing e conexão Redis precisam ser instâncias únicas — múltiplos registries dariam métricas fragmentadas e múltiplas conexões desperdiçariam recursos.
 
@@ -82,7 +82,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 **Por que escolhemos:** as APIs de bibliotecas externas (BullMQ, ioredis, prom-client) são ricas e específicas; o domínio quer um contrato mínimo. O Adapter traduz uma na outra.
 
-**Tradeoffs:** uma camada extra de tradução; risco de "vazar" semântica específica do backend através do port (ex.: o conceito de `attempt` 1-based teve que ser harmonizado entre BullMQ `attemptsMade+1` em `:64` e a fila in-memory).
+**Tradeoffs:** uma camada extra de tradução; risco de "vazar" semântica específica do backend através do port (ex.: o conceito de `attempt` 1-based teve que ser harmonizado entre BullMQ `attemptsMade + 1` em `bullmq-queue.adapter.ts:63` e a fila in-memory).
 
 **Pontos positivos:** o use case nunca importa `bullmq` nem `ioredis`. Trocar a fila não toca no worker.
 
@@ -165,14 +165,14 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 ### 12. Chain of Responsibility (pipeline HTTP: Middleware → Guard → Pipe → Filter)
 **Categoria:** Comportamental
 **Onde:**
-- Middleware: `CorrelationMiddleware` (`correlation.middleware.ts:11`) aplicado a `forRoutes('*')` em `app.module.ts:33-35`.
+- Middleware: `CorrelationMiddleware` (`correlation.middleware.ts:11`) aplicado a `forRoutes('*')` em `app.module.ts:34-37` (`AppModule.configure()`).
 - Guard: `AdminTokenGuard` (`admin-token.guard.ts:21`, `implements CanActivate`) em `admin.controller.ts:16` (`@UseGuards`).
 - Pipe: `ValidationPipe` global (`main.ts:18`).
-- Exception Filter: `DomainExceptionFilter` (`domain-exception.filter.ts:37`, `@Catch()`) global em `main.ts:21`.
+- Exception Filter: `DomainExceptionFilter` (`domain-exception.filter.ts:36` `@Catch()`, classe l.37) global em `main.ts:21`.
 
 **Por que escolhemos:** cada concern transversal (correlação, autenticação, validação, tradução de erro) é um elo independente do pipeline de request do Nest, executado em ordem e podendo interromper a cadeia.
 
-**Tradeoffs:** ordem de execução implícita pode confundir (ex.: alinhamento do `correlationId` entre pino e o middleware, tratado em `correlation.middleware.ts:15-16`).
+**Tradeoffs:** ordem de execução implícita pode confundir (ex.: alinhamento do `correlationId` entre pino e o middleware, tratado em `correlation.middleware.ts:15-19`).
 
 **Pontos positivos:** controllers ficam livres de boilerplate de auth/validação/erro; cada elo é testável e reutilizável.
 
@@ -207,13 +207,13 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 ### 15. Compensating Transaction (compensação de estoque / sabor Saga)
 **Categoria:** Comportamental / Confiabilidade
 **Onde:** três pontos de compensação que liberam o estoque reservado:
-- Falha durante a reserva multi-item no checkout: libera o que já reservou (`checkout.usecase.ts:119-124`).
+- Falha durante a reserva multi-item no checkout: libera o que já reservou (`checkout.usecase.ts:119-125`).
 - Worker esgotou tentativas: `onExhausted` → `FAILED` + `stock.release` por item (`checkout.worker.ts:100-123`).
 - Reconciliação de PENDING órfão muito antigo: `FAILED` + release (`reconcile.usecase.ts:42-54`).
 
 **Por que escolhemos:** sem transação distribuída entre estoque (Redis) e ERP, a consistência é mantida por compensação: reserva primeiro, libera se o fluxo falhar — evita overselling permanente.
 
-**Tradeoffs:** janela de inconsistência temporária (estoque reservado enquanto o job tenta); se a própria compensação falhar é grave — por isso o BullMQ adapter loga ruidosamente quando `onExhausted` rejeita (`bullmq-queue.adapter.ts:72-80`).
+**Tradeoffs:** janela de inconsistência temporária (estoque reservado enquanto o job tenta); se a própria compensação falhar é grave — por isso o BullMQ adapter loga ruidosamente quando `onExhausted` rejeita (`bullmq-queue.adapter.ts:74-80`).
 
 **Pontos positivos:** estoque nunca fica "preso" silenciosamente em pedidos fracassados; consistência eventual garantida.
 
@@ -221,11 +221,11 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 16. Retry com Exponential Backoff
 **Categoria:** Comportamental / Confiabilidade
-**Onde:** BullMQ nativo (`bullmq-queue.adapter.ts:52-56` `attempts` + `backoff: { type: 'exponential' }`) e equivalente in-memory (`in-memory-queue.adapter.ts:52-69` + `ExponentialBackoff`). Configurável via `worker.maxAttempts`/`backoffMs` (`app-config.ts:52-55`).
+**Onde:** BullMQ nativo (`bullmq-queue.adapter.ts:51-56` `attempts` + `backoff: { type: 'exponential' }`) e equivalente in-memory (`in-memory-queue.adapter.ts:52-69` + `ExponentialBackoff`). Configurável via `worker.maxAttempts`/`backoffMs` (`app-config.ts:52-55`).
 
 **Por que escolhemos:** o ERP falha intermitentemente; reentar com espaçamento crescente absorve falhas transitórias sem martelar o ERP.
 
-**Tradeoffs:** aumenta latência até a confirmação; precisa de teto (`maxMs`, `backoff.strategy.ts:17`) para não explodir o delay.
+**Tradeoffs:** aumenta latência até a confirmação; precisa de teto (`maxMs`, `backoff.strategy.ts:19`) para não explodir o delay.
 
 **Pontos positivos:** taxa de sucesso real do checkout sobe sem intervenção; degrada graciosamente para `FAILED` + compensação.
 
@@ -233,7 +233,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 17. Dead Letter Queue (DLQ lógica)
 **Categoria:** Arquitetural / Confiabilidade
-**Onde:** BullMQ mantém jobs falhos para inspeção: `removeOnFail: false` (`bullmq-queue.adapter.ts:56`, comentário "logical DLQ"). Jobs esgotados disparam `onExhausted` (compensação), mas permanecem inspecionáveis.
+**Onde:** BullMQ mantém jobs falhos para inspeção: `removeOnFail: false` (`bullmq-queue.adapter.ts:55`, comentário "logical DLQ"). Jobs esgotados disparam `onExhausted` (compensação), mas permanecem inspecionáveis.
 
 **Por que escolhemos:** falhas definitivas precisam ser auditáveis (por que o pedido falhou?), não silenciosamente descartadas.
 
@@ -246,13 +246,13 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 ### 18. Cache-Aside + Single-Flight + Stale-While-Error + TTL Jitter
 **Categoria:** Arquitetural / Performance
 **Onde:** Port `CachePort.getOrLoad()` (`cache.port.ts:18-23`). Implementações:
-- **Cache-aside**: tenta cache; em miss roda `loader`, grava com TTL (`redis-cache.adapter.ts:43-57`, `in-memory-cache.adapter.ts:38-65`).
+- **Cache-aside**: tenta cache; em miss roda `loader`, grava com TTL (`redis-cache.adapter.ts:43-58`, `in-memory-cache.adapter.ts:38-65`).
 - **Single-flight**: mapa `inflight` coalesce misses concorrentes na **mesma** chave numa única execução do loader (`in-memory-cache.adapter.ts:49-54`, `redis-cache.adapter.ts:46-58`) — anti-stampede.
 - **Stale-while-error**: se o loader falha e `staleOnError`, serve `lastKnown` (`in-memory-cache.adapter.ts:70-76`).
-- **TTL jitter**: `ttl()` em `list-products.usecase.ts:27-32` adiciona jitter aleatório para espalhar expirações.
+- **TTL jitter**: aplicado no **adapter** de cache (`cache-jitter.ts` → `createJitter()`), modelo **proporcional** `[ttl, ttl*(1+ratio)]` com `stampedeJitterRatio` (`app-config.ts`); o `ttl()` em `list-products.usecase.ts` passa o TTL puro. Espalha expirações para evitar stampede.
 - Uso: `ListProductsUseCase.listAll()` (`list-products.usecase.ts:34-45`).
 
-**Por que escolhemos:** o catálogo é lido com alta frequência e o "ERP" (repo) tem latência simulada (`in-memory-product.repo.ts:22` 40ms). Cache reduz pressão e latência; single-flight + jitter previnem stampede quando a chave expira sob carga; stale-on-error mantém a vitrine viva se o ERP cair.
+**Por que escolhemos:** o catálogo é lido com alta frequência e o **repositório de catálogo** simula 40ms de latência (`in-memory-product.repo.ts:22`, modelando uma API síncrona) — distinto do ERP de faturamento, que simula 50–300ms (`ERP_MIN/MAX_LATENCY_MS`, `app-config.ts:58-59`). Cache reduz pressão e latência; single-flight + jitter previnem stampede quando a chave expira sob carga; stale-on-error mantém a vitrine viva se o ERP cair.
 
 **Tradeoffs:** dados podem ficar levemente desatualizados (TTL); single-flight in-process não coordena entre instâncias (o `redis-cache.adapter.ts:5-8` reconhece que precisaria de lock `SET NX` cross-instance).
 
@@ -312,7 +312,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 23. Ambient Context / Thread-Local (AsyncLocalStorage para correlationId)
 **Categoria:** Comportamental
-**Onde:** `src/observability/correlation.ts:12` `AsyncLocalStorage<CorrelationStore>`; `runWithCorrelation` propaga em todo o request (middleware, `correlation.middleware.ts:18`) **e** no worker (`checkout.worker.ts:34-48`). Logger e spans leem do contexto (`tracing.service.ts:32`, `logger.config.ts:25-27`).
+**Onde:** `src/observability/correlation.ts:12` `AsyncLocalStorage<CorrelationStore>`; `runWithCorrelation` propaga em todo o request (middleware, `correlation.middleware.ts:21`) **e** no worker (`checkout.worker.ts:34-48`). Logger e spans leem do contexto (`tracing.service.ts:35` → `startSpan()`, `logger.config.ts:25-27`).
 
 **Por que escolhemos:** propagar `correlationId`/`orderId` por toda a cadeia assíncrona sem passar parâmetro em cada função — traceabilidade ponta a ponta (HTTP → fila → worker → ERP).
 
@@ -338,11 +338,86 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 **Categoria:** Confiabilidade / concorrência
 **Onde:** `RESERVE_LUA` (`redis-stock.adapter.ts:13-20`) faz GET+compare+DECRBY atômico no servidor Redis; `REMEMBER_LUA` (`redis-idempotency.adapter.ts:12-16`) faz SET NX + GET atômico. Equivalente in-memory: seção crítica síncrona sem `await` entre leitura e escrita (`in-memory-stock.adapter.ts:21-29`, comentário `:22`).
 
-**Por que escolhemos:** reserva de estoque sob concorrência inter-processo é o coração do "evitar overselling". Lua garante atomicidade real entre múltiplas instâncias; in-memory aproveita o single-thread do Node.
+#### Conceito: por que Lua no Redis
 
-**Tradeoffs:** lógica de negócio espalhada em string Lua (sem type-check, testada só de ponta a ponta — `stock-concurrency.spec.ts`).
+O Redis embute um interpretador **Lua**. Um script enviado via `EVAL` executa
+**atomicamente no servidor** — o Redis é single-threaded para execução de comandos, e enquanto
+o script roda **nenhum outro comando é intercalado**. Isso transforma uma sequência
+"ler → decidir → escrever" em **uma única operação indivisível**, em um único round-trip.
 
-**Pontos positivos:** overselling impossível mesmo com N instâncias; paridade conceitual memory↔redis.
+O problema que isso resolve é o **TOCTOU** (*Time-Of-Check to Time-Of-Use*): a janela entre
+*checar* um valor e *agir* sobre ele. Nessa janela, outra requisição — possivelmente em **outra
+instância da aplicação** — pode alterar o valor, e a decisão passa a se basear em estado
+obsoleto. Dois comandos separados (`GET` e depois `DECRBY`) deixam essa janela aberta; o Lua a
+fecha porque o check e o write ficam grudados.
+
+Por que não usar `MULTI/EXEC` (transações Redis)? Porque uma transação Redis apenas **enfileira**
+comandos e os executa em bloco — ela **não permite lógica condicional baseada no valor lido**
+(o `if current < qty`). `WATCH`+`MULTI` (optimistic locking) resolveria, mas exigiria retry no
+cliente em caso de contenção. O Lua dá a condicional **e** a atomicidade num passo só, sem
+retry.
+
+#### Script 1 — `RESERVE_LUA`: reserva de estoque anti-overselling
+
+```lua
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local qty = tonumber(ARGV[1])
+if qty <= 0 then return {0, current} end
+if current < qty then return {0, current} end   -- estoque insuficiente → falha
+local remaining = redis.call('DECRBY', KEYS[1], qty)
+return {1, remaining}
+```
+
+- `KEYS[1]` = chave do estoque (`stock:<productId>`); `ARGV[1]` = quantidade pedida.
+- **Lê** o saldo, **valida** (`qty > 0` e `current >= qty`) e **só então decrementa** — tudo
+  atômico. Retorna `{ok, saldo}`: `{1, restante}` se reservou, `{0, atual}` se recusou.
+- **Garantia:** com N instâncias e milhares de requisições simultâneas, é **impossível vender
+  mais do que existe**. Sem o Lua, dois pedidos concorrentes poderiam ambos passar no
+  `if current < qty` antes de qualquer um decrementar (clássico oversell por corrida).
+- O `release` (`redis-stock.adapter.ts:43`) é um `INCRBY` simples — a compensação não precisa de
+  check, apenas devolve o saldo.
+
+#### Script 2 — `REMEMBER_LUA`: idempotência sem corrida
+
+```lua
+local created = redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2], 'NX')
+local val = redis.call('GET', KEYS[1])
+if created then return {1, val} else return {0, val} end
+```
+
+- `SET ... NX` grava **só se a chave não existir**; `PX` define TTL em ms. Em seguida o `GET` lê
+  o valor efetivo. Retorna `{1, orderId}` se *criou agora* (1ª vez) ou `{0, orderIdExistente}`
+  em *replay* (retry de rede / duplo-clique).
+- **Por que não `SET NX` e depois `GET` separados?** Como documenta o comentário do código
+  (`redis-idempotency.adapter.ts:6-11`): a chave tem TTL e poderia **expirar entre o SET e o
+  GET**, fazendo o read-back retornar `nil` e a aplicação devolver o `orderId` errado. O script
+  garante que escrita e leitura observem o mesmo instante lógico.
+
+#### Paridade memory ↔ redis
+
+O adapter in-memory atinge a mesma garantia **sem** Lua: ele faz a checagem e a escrita numa
+**seção crítica síncrona** (sem `await` entre o `if` e o decremento — `in-memory-stock.adapter.ts:21-29`).
+Como o event loop do Node é single-threaded e só troca de tarefa em pontos de `await`, não há
+preempção no meio da operação. É o mesmo princípio de atomicidade do Redis (single-thread),
+aplicado ao runtime local — por isso os dois adapters são **comportamentalmente equivalentes** e
+o teste `stock-concurrency.spec.ts` exercita a propriedade anti-oversell em ambos.
+
+**Por que escolhemos:** reserva de estoque sob concorrência inter-processo é o coração do
+"evitar overselling", e idempotência sob retries concorrentes é o coração do "1 pedido por
+chave". Lua garante atomicidade real **entre múltiplas instâncias**; o in-memory aproveita o
+single-thread do Node para a mesma garantia em processo único.
+
+**Tradeoffs:** lógica de negócio em string Lua não tem type-check do TypeScript nem é coberta
+por testes unitários isolados (é validada de ponta a ponta em `stock-concurrency.spec.ts`);
+scripts complexos ficam difíceis de manter e debugar; e Lua longo demais pode bloquear o Redis
+(aqui os scripts são curtos e O(1), então o bloqueio é desprezível). Há ainda o risco de
+*hot key*: como toda reserva do mesmo produto serializa na mesma chave Redis, um SKU
+extremamente popular pode virar gargalo (mitigável por sharding de chave em produção).
+
+**Pontos positivos:** overselling e corrida de idempotência **impossíveis por construção**,
+mesmo com N instâncias; um único round-trip por operação (menos latência que optimistic locking
+com retry); e paridade conceitual memory↔redis que mantém a regra de negócio idêntica nos dois
+drivers.
 
 ---
 
@@ -394,7 +469,7 @@ Esta seção é o "porquê do que falta". Em cada caso a ausência foi conscient
 | 1 | Ports & Adapters / Hexagonal | Arquitetural | `application/ports/*`, `infrastructure/**` | Swap memory↔redis sem tocar domínio |
 | 2 | Dependency Injection | Arquitetural | `checkout.usecase.ts:46-55` | Testabilidade, baixo acoplamento |
 | 3 | Provider/Factory | Criacional | `infrastructure.module.ts:34-97` | Seleção de adapter em runtime |
-| 4 | Singleton | Criacional | `metrics.service.ts:8`, `redis.provider.ts` | Recursos compartilhados únicos |
+| 4 | Singleton | Criacional | `metrics.service.ts:10`, `redis.provider.ts` | Recursos compartilhados únicos |
 | 5 | Adapter | Estrutural | `bullmq-queue.adapter.ts:13-48` | Isola libs externas dos ports |
 | 6 | DTO + validação | Estrutural | `checkout.dto.ts:18-43`, `main.ts:18` | Contrato e 400 automáticos |
 | 7 | Facade | Estrutural | `checkout.usecase.ts:57` | Controllers finos |
@@ -406,9 +481,9 @@ Esta seção é o "porquê do que falta". Em cada caso a ausência foi conscient
 | 13 | Decorator (Nest) | Estrutural | uso pervasivo | Metadados declarativos |
 | 14 | Idempotência | Confiabilidade | `redis-idempotency.adapter.ts:12`, `checkout.usecase.ts:88` | Exactly-once para o cliente |
 | 15 | Compensating Transaction | Confiabilidade | `checkout.worker.ts:100-123` | Estoque nunca preso |
-| 16 | Retry + Backoff | Confiabilidade | `bullmq-queue.adapter.ts:52`, `backoff.strategy.ts` | Absorve falhas do ERP |
-| 17 | Dead Letter Queue | Confiabilidade | `bullmq-queue.adapter.ts:56` | Auditoria de falhas |
-| 18 | Cache-Aside (+single-flight/stale/jitter) | Performance | `*-cache.adapter.ts`, `list-products.usecase.ts:27` | Baixa latência, anti-stampede |
+| 16 | Retry + Backoff | Confiabilidade | `bullmq-queue.adapter.ts:51`, `backoff.strategy.ts` | Absorve falhas do ERP |
+| 17 | Dead Letter Queue | Confiabilidade | `bullmq-queue.adapter.ts:55` | Auditoria de falhas |
+| 18 | Cache-Aside (+single-flight/stale/jitter) | Performance | `*-cache.adapter.ts`, `cache-jitter.ts` | Baixa latência, anti-stampede |
 | 19 | Reconciliation | Confiabilidade | `reconcile.usecase.ts:21` | Sem pedido órfão eterno |
 | 20 | Outbox (lógico) | Confiabilidade | `checkout.usecase.ts:127-145` | Sem perda silenciosa de pedido |
 | 21 | Entity / VO / funções puras | DDD | `order.ts`, `stock.ts`, `product.ts` | Regra testável sem infra |

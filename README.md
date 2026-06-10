@@ -14,7 +14,7 @@ Serviço backend que expõe **catálogo com cache**, **checkout assíncrono** (2
 
 ```bash
 npm ci
-npm test          # 23 testes: domínio, cache, concorrência/overselling, idempotência, e2e HTTP
+npm test          # 26 testes: domínio, cache, concorrência/overselling, idempotência, e2e HTTP
 npm run build
 npm start         # sobe em http://localhost:3000  (Swagger em /docs, métricas em /metrics)
 ```
@@ -152,7 +152,10 @@ Reconciliação: varre PENDING órfãos → reenfileira ou FAILED+compensa
 ## Runbook / Dashboard / Alertas (Datadog ou equivalente)
 
 ### Dashboard (painéis sugeridos)
-1. **Tráfego/Latência** — RPS e p50/p95/p99 por rota (`http_request_duration`).
+1. **Tráfego/Latência** — RPS e p50/p95/p99 por rota via histograma
+   `http_request_duration_seconds{method,route,status_code}` (rota é o **padrão**, ex.
+   `/orders/:orderId/status`); checkout e worker têm histogramas dedicados
+   (`checkout_duration_seconds`, `worker_duration_seconds`).
 2. **Cache** — `cache_requests_total` por resultado, hit ratio, offload do ERP.
 3. **Checkout** — taxa de 202, conflitos (409), `checkout_duration_seconds`.
 4. **Fila/Worker** — `queue_depth`, `worker_jobs_total{result}`, `worker_duration_seconds`.
@@ -160,7 +163,8 @@ Reconciliação: varre PENDING órfãos → reenfileira ou FAILED+compensa
 6. **ERP** — `erp_calls_total{result}`, `erp_call_duration_seconds`.
 
 ### Alertas
-- `cache_hit_ratio < 80%` por 10 min → revisar TTL / chave quente.
+- **hit ratio < 80%** por 10 min → revisar TTL / chave quente. _Valor derivado em PromQL/Datadog:
+  `rate(cache_requests_total{result="hit"}[5m]) / rate(cache_requests_total[5m])` — não é série emitida._
 - p95 `GET /products` > 200 ms por 5 min → degradação de cache/ERP.
 - `queue_depth` crescente / `worker_jobs_total{result="failed"}` > 0 → backlog/ERP indisponível.
 - `oversell_prevented_total` subindo rápido → pico de demanda em SKU sem estoque.

@@ -111,7 +111,7 @@
 | 18 | `in-memory-cache.adapter.ts:49-54` (single-flight) | ✅ EXATA | bloco `inflight.get(key)` (l.49-54) | `in-memory-cache.adapter.ts → getOrLoad() single-flight` |
 | 18 | `redis-cache.adapter.ts:46-58` (single-flight) | ✅ EXATA | `inflight.get`/`inflight.set` (l.46-58) | `redis-cache.adapter.ts → getOrLoad() single-flight` |
 | 18 | `in-memory-cache.adapter.ts:70-76` (stale-while-error) | ✅ EXATA | `if (opts.staleOnError && lastKnown.has)` (l.70-76) | `in-memory-cache.adapter.ts → getOrLoad() stale fallback` |
-| 18 | `list-products.usecase.ts:27-32` (`ttl()` jitter) | ✅ EXATA | `private ttl()` jitter (l.27-32) | `list-products.usecase.ts → ListProductsUseCase.ttl()` |
+| 18 | `list-products.usecase.ts:27-32` (`ttl()` jitter) | ❌ DESATUALIZADA | O jitter foi movido para o **adapter**: `cache-jitter.ts → createJitter()` (proporcional, `stampedeJitterRatio`); `ttl()` (l.31-33) hoje retorna **TTL puro** | `cache-jitter.ts → createJitter()` + `redis-cache.adapter.ts:36` |
 | 18 | `list-products.usecase.ts:34-45` (`listAll()`) | ✅ EXATA | `async listAll()` (l.34-45) | `list-products.usecase.ts → ListProductsUseCase.listAll()` |
 | 18 | `in-memory-product.repo.ts:22` (40ms) | ⚠️ DESLOCADA | default `latencyMs = 40` está na **l.22**; valor 40 também é o default — ✅ na linha, mas "40ms" literal vem de `infrastructure.module.ts:80` | `in-memory-product.repo.ts → constructor latencyMs default` |
 | 18 | `redis-cache.adapter.ts:5-8` (lock cross-instance) | ✅ EXATA | comentário "cross-instance … SET NX lock" (l.5-7) | `redis-cache.adapter.ts → file header (cross-instance note)` |
@@ -168,7 +168,7 @@
 | 15 | `checkout.worker.ts:100-123` | ✅ EXATA | onExhausted() |
 | 16 | `bullmq-queue.adapter.ts:52` | ✅ EXATA | enqueue() attempts |
 | 17 | `bullmq-queue.adapter.ts:56` | ⚠️ DESLOCADA | `removeOnFail:false` é l.55 |
-| 18 | `list-products.usecase.ts:27` | ✅ EXATA | ttl() |
+| 18 | `list-products.usecase.ts:27` | ❌ DESATUALIZADA | jitter movido p/ `cache-jitter.ts`; `ttl()` agora retorna TTL puro (l.31-33) |
 | 19 | `reconcile.usecase.ts:21` | ✅ EXATA | classe |
 | 20 | `checkout.usecase.ts:127-145` | ✅ EXATA | etapas 3-4 |
 | 22 | `domain-exception.filter.ts:22-34` | ✅ EXATA | statusFor() |

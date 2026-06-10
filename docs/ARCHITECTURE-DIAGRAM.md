@@ -36,7 +36,7 @@ flowchart LR
             P2(["STOCK_PORT"])
             P3(["IDEMPOTENCY_PORT"])
             P4(["QUEUE_PORT"])
-            P5(["REPOSITORY_PORT"])
+            P5(["ORDER_REPO_PORT<br/>PRODUCT_REPO_PORT"])
             P6(["ERP_PORT"])
         end
     end
@@ -47,7 +47,7 @@ flowchart LR
         A2["StockAdapter<br/>redis(Lua) ┆ in-memory"]
         A3["IdempotencyAdapter<br/>redis(Lua) ┆ in-memory"]
         A4["QueueAdapter<br/>BullMQ ┆ in-memory"]
-        A5["RepoAdapter<br/>in-memory Map"]
+        A5["Order/Product Repo<br/>in-memory Map"]
         A6["FakeErpClient"]
     end
 

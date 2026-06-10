@@ -163,7 +163,7 @@ Campos por domínio: `orderId`, `productId`, `qty`, `idempotencyKey`, `cacheResu
 
 ### (b) Métricas
 
-**Cache:** `cache_requests_total{result}` (counter), `cache_hit_ratio` (gauge), `cache_served_age_seconds` (histogram).
+**Cache:** `cache_requests_total{result}` (counter, **emitido pela aplicação**); `cache_hit_ratio` e `cache_served_age_seconds` são **derivados** dele em PromQL/Datadog (não são séries próprias).
 **Checkout:** `checkout_requests_total{status}` (counter), `checkout_inflight` (gauge), `checkout_duration_seconds` (histogram).
 **Fila/Worker:** `worker_jobs_total{result}` (counter: completed/failed/retried/dlq), `queue_depth` (gauge), `queue_wait_seconds` / `worker_duration_seconds` (histogram), `worker_retries_total` (counter).
 **Estoque:** `stock_reservation_total{result=ok|insufficient}` (counter), `stock_available` (gauge por SKU quente), `oversell_prevented_total` (counter).

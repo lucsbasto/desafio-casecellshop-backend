@@ -29,7 +29,7 @@
 - [x] Endpoints: GET /products, POST /checkout, GET /orders/:id/status
 - [x] Observabilidade: pino + prom-client + spans
 - [x] OpenAPI export
-- [x] Testes: unit (domínio) + integração (cache hit/miss, overselling, idempotência) — 23/23 verdes
+- [x] Testes: unit (domínio) + integração (cache hit/miss, overselling, idempotência) — 26/26 verdes
 - [x] docker-compose.yml + .env.example
 - [x] RESPOSTAS-CONCEITUAIS.md (5 perguntas)
 - [x] README + PROMPTS.md
@@ -37,7 +37,7 @@
 - [x] Biome (lint+format) no lugar do ESLint
 
 ## Status final
-Entrega completa: build compila, 23/23 testes verdes. Caminho Redis e2e (REDIS_E2E=1)
+Entrega completa: build compila, 26/26 testes verdes. Caminho Redis e2e (REDIS_E2E=1)
 fica adiado — requer Docker (B1). Publicação no GitHub fica a cargo do usuário (D4).
 
 ## Deferred Ideas

@@ -72,15 +72,15 @@ Use case de storefront (read-only) que lê produtos via cache-aside (TTL + singl
 
 ## LOW
 
-### L1 — TTL recomputado por chamada com jitter; sem garantia de jitter mínimo
-- **Local:** linhas 27–32.
-- **Descrição:** `ttl()` é avaliado a cada chamada (ok), mas `Math.floor(Math.random() * stampedeJitterMs)` pode ser 0, e se `stampedeJitterMs` vier 0/NaN (config), o jitter degenera. `num()` já protege NaN com default, então é baixo. Apenas observe que jitter pode ser 0 — anti-stampede fica sem margem nesse tick.
-- **Impacto:** mínimo; em pico improvável de expirações alinhadas o single-flight do adapter ainda protege.
-- **Correção sugerida:** opcional — jitter centrado (`base + (random*2-1)*jitter`) ou garantir piso. Não bloqueante.
+### L1 — TTL recomputado por chamada (jitter movido para o adapter) — RESOLVIDO
+- **Local:** linhas 27–33 (`ttl()`).
+- **Descrição:** `ttl()` é avaliado a cada chamada e hoje retorna apenas o TTL puro (`config.cache.productsTtlMs`). O jitter anti-stampede saiu do use case e passou a ser aplicado no adapter (`cache-jitter.ts → createJitter()`), agora **proporcional** (`stampedeJitterRatio`, default `DEFAULT_JITTER_RATIO`) e com `ratio` clampado a `[0, 1]`. Some assim a antiga fórmula `Math.random() * stampedeJitterMs` e o risco de jitter degenerado.
+- **Impacto:** nenhum; mesmo com `ratio = 0` o single-flight do adapter ainda protege contra stampede.
+- **Correção sugerida:** nenhuma — concern de infra centralizado no adapter.
 
 ### L2 — `Math.random()` não-cripto para jitter
-- **Local:** linha 30.
-- **Descrição:** `Math.random()` é adequado para jitter de TTL (não-segurança). Apenas registrando que não deve ser confundido com fonte segura — aqui está correto o uso.
+- **Local:** `cache-jitter.ts` (`createJitter()`), não mais no use case.
+- **Descrição:** `Math.random()` é adequado para jitter de TTL (não-segurança). Apenas registrando que não deve ser confundido com fonte segura — aqui o uso está correto.
 - **Impacto:** nenhum (uso legítimo). Mantido por completude da revisão.
 - **Correção sugerida:** nenhuma ação necessária.
 

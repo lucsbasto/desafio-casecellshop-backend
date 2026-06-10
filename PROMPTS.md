@@ -52,7 +52,7 @@ checkout com idempotência por `Idempotency-Key`.
   conexão ao BullMQ em vez da instância).
 - Correção do harness de teste (semear o estoque, espelhando o `StockSeeder` do módulo Nest).
 - Garantia de determinismo nos testes (ERP com `random` injetável; backoff 0 nos testes).
-- Validação final: `npm run build` verde e **23 testes** passando.
+- Validação final: `npm run build` verde e **26 testes** passando.
 
 ## Princípio
 IA acelera; a **responsabilidade de engenharia permanece humana**. Toda decisão de arquitetura,
