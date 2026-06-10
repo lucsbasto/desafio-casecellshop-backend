@@ -36,9 +36,13 @@ export function buildLoggerParams(serviceName: string, level: string, env: strin
         }),
         res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
       },
-      transport: isDev
-        ? { target: 'pino-pretty', options: { singleLine: true, colorize: true } }
-        : undefined,
+      // pino-pretty roda num worker thread. Em produção usamos JSON puro; e quando os
+      // logs estão silenciados (ex.: testes) também dispensamos o worker, evitando
+      // handles vazados e custo de inicialização desnecessário.
+      transport:
+        isDev && level !== 'silent'
+          ? { target: 'pino-pretty', options: { singleLine: true, colorize: true } }
+          : undefined,
     },
   };
 }
