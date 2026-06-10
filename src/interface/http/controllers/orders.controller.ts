@@ -16,7 +16,10 @@ export class OrdersController {
 
   @Get(':orderId/status')
   @ApiOkResponse({ type: OrderStatusDto, description: 'Status e histórico do pedido' })
-  @ApiNotFoundResponse({ type: ErrorDto })
+  @ApiNotFoundResponse({
+    type: ErrorDto,
+    description: 'Pedido não encontrado para o orderId informado',
+  })
   @ApiInternalServerErrorResponse({ type: ErrorDto, description: 'Erro interno inesperado' })
   async status(@Param('orderId') orderId: string): Promise<OrderStatusDto> {
     const order = await this.getStatus.execute(orderId);

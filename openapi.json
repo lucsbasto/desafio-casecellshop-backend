@@ -50,7 +50,7 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Produto encontrado",
             "content": {
               "application/json": {
                 "schema": {
@@ -60,7 +60,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Produto não encontrado para o id informado",
             "content": {
               "application/json": {
                 "schema": {
@@ -189,7 +189,7 @@
             }
           },
           "404": {
-            "description": "",
+            "description": "Pedido não encontrado para o orderId informado",
             "content": {
               "application/json": {
                 "schema": {

@@ -3,6 +3,11 @@ import { InMemoryCacheAdapter } from './in-memory-cache.adapter';
 import { RedisCacheAdapter } from './redis-cache.adapter';
 
 describe('InMemoryCacheAdapter', () => {
+  // Fake timers: Date.now() e setTimeout avançam juntos e de forma determinística,
+  // eliminando flakiness de wall-clock em janelas curtas (TTL/jitter) sob carga/CI.
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
   it('miss na 1ª chamada, hit na 2ª (cache-aside + TTL)', async () => {
     const cache = new InMemoryCacheAdapter();
     let loads = 0;
@@ -28,9 +33,11 @@ describe('InMemoryCacheAdapter', () => {
       return 'value';
     };
 
-    const results = await Promise.all(
+    const pending = Promise.all(
       Array.from({ length: 20 }, () => cache.getOrLoad('hot', 1000, loader)),
     );
+    await jest.advanceTimersByTimeAsync(20); // libera o setTimeout do loader
+    const results = await pending;
 
     expect(loads).toBe(1); // stampede avoided
     expect(results.every((r) => r.value === 'value')).toBe(true);
@@ -40,14 +47,14 @@ describe('InMemoryCacheAdapter', () => {
     const cache = new InMemoryCacheAdapter({ jitterRatio: 0 });
     await cache.set('k', 1, 10);
     expect(await cache.get('k')).toBe(1);
-    await new Promise((r) => setTimeout(r, 20));
+    await jest.advanceTimersByTimeAsync(20);
     expect(await cache.get('k')).toBeUndefined();
   });
 
   it('fallback stale-while-error serve o último valor bom quando o loader falha', async () => {
     const cache = new InMemoryCacheAdapter({ jitterRatio: 0 });
     await cache.set('k', 'bom', 5); // popula lastKnown
-    await new Promise((r) => setTimeout(r, 10)); // expira
+    await jest.advanceTimersByTimeAsync(10); // expira
 
     const res = await cache.getOrLoad(
       'k',
@@ -64,15 +71,18 @@ describe('InMemoryCacheAdapter', () => {
 });
 
 describe('InMemoryCacheAdapter TTL jitter', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
   it('estende o TTL do in-memory (jitter só aumenta a expiração)', async () => {
-    // random=1, ratio=1 → jitter dobra o TTL: 40ms vira ~80ms efetivos.
+    // random=1, ratio=1 → jitter dobra o TTL: 40ms vira 80ms efetivos.
     const cache = new InMemoryCacheAdapter({ jitterRatio: 1, random: () => 1 });
     await cache.set('k', 1, 40);
 
-    await new Promise((r) => setTimeout(r, 60)); // sem jitter já teria expirado (40ms)
+    await jest.advanceTimersByTimeAsync(60); // sem jitter já teria expirado (40ms)
     expect(await cache.get('k')).toBe(1);
 
-    await new Promise((r) => setTimeout(r, 40)); // total ~100ms > ~80ms efetivos
+    await jest.advanceTimersByTimeAsync(40); // total 100ms > 80ms efetivos
     expect(await cache.get('k')).toBeUndefined();
   });
 
@@ -80,7 +90,7 @@ describe('InMemoryCacheAdapter TTL jitter', () => {
     const cache = new InMemoryCacheAdapter({ jitterRatio: 0, random: () => 1 });
     await cache.set('k', 1, 20);
 
-    await new Promise((r) => setTimeout(r, 40));
+    await jest.advanceTimersByTimeAsync(40);
     expect(await cache.get('k')).toBeUndefined();
   });
 });

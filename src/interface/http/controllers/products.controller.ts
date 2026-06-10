@@ -22,8 +22,11 @@ export class ProductsController {
   }
 
   @Get(':id')
-  @ApiOkResponse({ type: ProductDto })
-  @ApiNotFoundResponse({ type: ErrorDto })
+  @ApiOkResponse({ type: ProductDto, description: 'Produto encontrado' })
+  @ApiNotFoundResponse({
+    type: ErrorDto,
+    description: 'Produto não encontrado para o id informado',
+  })
   @ApiInternalServerErrorResponse({ type: ErrorDto, description: 'Erro interno inesperado' })
   async findOne(@Param('id') id: string): Promise<ProductDto> {
     return this.listProducts.getById(id);
