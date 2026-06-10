@@ -10,3 +10,7 @@ coverage/
 # Tooling state / challenge brief (not part of the deliverable)
 .omc/
 *.pdf
+
+# Claude Code / OMC tooling state (not part of the deliverable)
+.claude/
+.specs/
