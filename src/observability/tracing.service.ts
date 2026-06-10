@@ -1,14 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import { type Span as OtelSpan, SpanStatusCode, trace } from '@opentelemetry/api';
 import { getCorrelationId } from './correlation';
 
 /**
- * Lightweight span-based tracing.
+ * Span-based tracing.
  *
- * JUSTIFIED STUB: to keep the challenge runnable without spinning up a collector,
- * we use a custom tracer that records spans with duration and correlates them via
- * correlationId. If `OTEL_EXPORTER_OTLP_ENDPOINT` is defined, the README
- * documents how to plug in the real OpenTelemetry SDK (compatible with Datadog Agent).
- * The API (`startSpan`/`end`) is deliberately OTel-compatible for easy swapping.
+ * Dupla saída, sem mudar a API consumida pelos use-cases:
+ *  1. Spans REAIS do OpenTelemetry, via o tracer global. Quando o SDK está ativo
+ *     (`OTEL_EXPORTER_OTLP_ENDPOINT` definido — ver `otel.ts`), os spans são exportados
+ *     via OTLP ao collector → Jaeger. Sem o SDK, o tracer global é no-op (zero custo,
+ *     mantém o desafio executável e os testes verdes sem dependências externas).
+ *  2. Ring buffer em memória, usado por `recentSpans()` para diagnóstico/inspeção e testes.
  */
 export interface Span {
   name: string;
@@ -24,6 +26,8 @@ interface FinishedSpan {
 
 @Injectable()
 export class TracingService {
+  private readonly tracer = trace.getTracer('casecellshop-backend');
+
   // Fixed-size ring buffer: O(1) writes, bounded memory, no array reindexing.
   private readonly maxBuffer = 1000;
   private readonly finished: (FinishedSpan | undefined)[] = new Array(this.maxBuffer);
@@ -33,11 +37,24 @@ export class TracingService {
   startSpan(name: string, attributes: Record<string, unknown> = {}): Span {
     const startedAt = process.hrtime.bigint();
     const correlationId = getCorrelationId();
+    // Span OTel real (no-op quando o SDK não está iniciado). Herda o contexto ativo
+    // como pai automaticamente (ex.: span HTTP da auto-instrumentação).
+    const otelSpan: OtelSpan = this.tracer.startSpan(name, {
+      attributes: toOtelAttrs({ ...attributes, ...(correlationId ? { correlationId } : {}) }),
+    });
     const self = this;
     return {
       name,
       end(extra: Record<string, unknown> = {}): void {
         const durationMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+        if (extra.status === 'error') {
+          otelSpan.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: typeof extra.error === 'string' ? extra.error : undefined,
+          });
+        }
+        otelSpan.setAttributes(toOtelAttrs(extra));
+        otelSpan.end();
         self.record({
           name,
           durationMs,
@@ -81,4 +98,20 @@ export class TracingService {
     }
     return out;
   }
+}
+
+/**
+ * OTel só aceita atributos primitivos (string/number/boolean) ou arrays deles.
+ * Serializa valores complexos para não derrubar o span.
+ */
+function toOtelAttrs(attrs: Record<string, unknown>): Record<string, string | number | boolean> {
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value === undefined || value === null) continue;
+    out[key] =
+      typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+        ? value
+        : JSON.stringify(value);
+  }
+  return out;
 }

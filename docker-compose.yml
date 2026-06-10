@@ -1,6 +1,14 @@
-# Runtime de produção: sobe a API com Redis real (cache + fila BullMQ).
-# Uso: docker compose up --build
+# Stack completa da CaseCellShop: API + Redis + observabilidade (métricas e traces).
+#
+#   docker compose up --build
+#
+# Portas no host:
+#   API .......... http://localhost:3000      (Swagger /docs, métricas /metrics)
+#   Prometheus ... http://localhost:9090
+#   Grafana ...... http://localhost:3001       (admin / admin)
+#   Jaeger UI .... http://localhost:16686      (traces / APM)
 services:
+  # ---- Infra: cache + fila BullMQ + estoque + idempotência ----
   redis:
     image: redis:7-alpine
     ports:
@@ -12,11 +20,14 @@ services:
       timeout: 3s
       retries: 5
 
+  # ---- Aplicação NestJS ----
   app:
     build: .
     depends_on:
       redis:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     ports:
       - '3000:3000'
     environment:
@@ -32,5 +43,55 @@ services:
       WORKER_MAX_ATTEMPTS: '3'
       WORKER_BACKOFF_MS: '500'
       ERP_FAIL_RATE: '0.3'
-      # Descomente para exportar traces ao Datadog Agent / OTel collector:
-      # OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      # Exporta traces (OTLP/HTTP) para o collector — papel do Datadog Agent.
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: casecellshop-backend
+
+  # ---- Métricas: coleta o /metrics (prom-client) ----
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  # ---- Dashboards e alertas (equivalente ao Datadog) ----
+  grafana:
+    image: grafana/grafana:11.4.0
+    depends_on:
+      - prometheus
+    ports:
+      - '3001:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
+  # ---- Collector OTLP: recebe traces do app e repassa ao Jaeger ----
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    command: ['--config=/etc/otel-collector-config.yaml']
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - '4318:4318' # OTLP HTTP
+      - '4317:4317' # OTLP gRPC
+    depends_on:
+      - jaeger
+
+  # ---- Visualização de traces / APM ----
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    ports:
+      - '16686:16686' # UI
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+
+volumes:
+  grafana-data:

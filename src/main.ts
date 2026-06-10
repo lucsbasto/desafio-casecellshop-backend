@@ -1,3 +1,6 @@
+// DEVE ser o primeiro import: inicia o OpenTelemetry antes de http/express/nest serem
+// carregados, para que as auto-instrumentações consigam fazer o patch desses módulos.
+import './observability/otel';
 import 'reflect-metadata';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
