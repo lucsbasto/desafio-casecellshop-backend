@@ -9,6 +9,7 @@ import { Counter, collectDefaultMetrics, Gauge, Histogram, Registry } from 'prom
 export class MetricsService {
   readonly registry = new Registry();
 
+  readonly httpRequestDuration: Histogram<string>;
   readonly cacheRequests: Counter<string>;
   readonly checkoutRequests: Counter<string>;
   readonly checkoutDuration: Histogram<string>;
@@ -23,6 +24,14 @@ export class MetricsService {
   constructor() {
     collectDefaultMetrics({ register: this.registry });
 
+    this.httpRequestDuration = new Histogram({
+      name: 'http_request_duration_seconds',
+      help: 'Latência das requisições HTTP por método, rota e status',
+      // Low-cardinality: `route` é o PADRÃO da rota (ex.: /orders/:orderId/status), não a URL concreta.
+      labelNames: ['method', 'route', 'status_code'],
+      buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 2],
+      registers: [this.registry],
+    });
     this.cacheRequests = new Counter({
       name: 'cache_requests_total',
       help: 'Total de acessos ao cache por resultado',
