@@ -5,7 +5,7 @@ import {
   InsufficientStockError,
   ProductNotFoundError,
 } from '../../domain/errors';
-import { Order, OrderItem, OrderStatus } from '../../domain/order';
+import { createPendingOrder, Order, OrderItem } from '../../domain/order';
 import { APP_CONFIG, AppConfig } from '../../infrastructure/config/app-config';
 import { setOrderId } from '../../observability/correlation';
 import { MetricsService } from '../../observability/metrics.service';
@@ -93,10 +93,38 @@ export class CheckoutUseCase {
     }
 
     // 2) Validates products / prices and atomically reserves stock.
+    const totalCents = await this.reserveItems(input.items);
+
+    // 3) Saves the PENDING order (source of truth) BEFORE enqueueing.
+    const order = createPendingOrder({
+      id: orderId,
+      items: input.items,
+      idempotencyKey: key,
+      totalCents,
+      now: new Date().toISOString(),
+    });
+    await this.orders.save(order);
+
+    // 4) Enqueues (logical outbox). If this fails, reconciliation will re-enqueue.
+    await this.tracing.withSpan('queue.enqueue', () =>
+      this.queue.enqueue({ orderId: order.id, correlationId: input.correlationId }),
+    );
+    this.metrics.queueDepth.set(await this.queue.depth());
+
+    this.logger.log(`Pedido ${order.id} criado (PENDING) e enfileirado`);
+    return { order, replay: false };
+  }
+
+  /**
+   * Validates each product and atomically reserves its stock, returning the order
+   * total. On any failure it compensates (releases) whatever was already reserved
+   * in this attempt before rethrowing, so a partial reservation never leaks.
+   */
+  private async reserveItems(items: OrderItem[]): Promise<number> {
     const reserved: OrderItem[] = [];
     let totalCents = 0;
     try {
-      for (const item of input.items) {
+      for (const item of items) {
         const product = await this.products.findById(item.productId);
         if (!product) throw new ProductNotFoundError(item.productId);
 
@@ -112,6 +140,7 @@ export class CheckoutUseCase {
         reserved.push(item);
         totalCents += product.priceCents * item.quantity;
       }
+      return totalCents;
     } catch (err) {
       // Compensation: releases what was already reserved in this attempt.
       for (const r of reserved) {
@@ -119,29 +148,5 @@ export class CheckoutUseCase {
       }
       throw err;
     }
-
-    // 3) Saves the PENDING order (source of truth) BEFORE enqueueing.
-    const now = new Date().toISOString();
-    const order: Order = {
-      id: orderId,
-      items: input.items,
-      status: OrderStatus.PENDING,
-      history: [{ status: OrderStatus.PENDING, at: now }],
-      idempotencyKey: key,
-      totalCents,
-      createdAt: now,
-      updatedAt: now,
-      attempts: 0,
-    };
-    await this.orders.save(order);
-
-    // 4) Enqueues (logical outbox). If this fails, reconciliation will re-enqueue.
-    await this.tracing.withSpan('queue.enqueue', () =>
-      this.queue.enqueue({ orderId: order.id, correlationId: input.correlationId }),
-    );
-    this.metrics.queueDepth.set(await this.queue.depth());
-
-    this.logger.log(`Pedido ${order.id} criado (PENDING) e enfileirado`);
-    return { order, replay: false };
   }
 }

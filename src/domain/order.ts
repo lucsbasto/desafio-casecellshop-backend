@@ -49,6 +49,32 @@ export function isTerminal(status: OrderStatus): boolean {
   return status === OrderStatus.CONFIRMED || status === OrderStatus.FAILED;
 }
 
+/**
+ * Builds a fresh PENDING order with its initial history entry. Centralizes the
+ * "newborn order" shape (status, seed history, zeroed attempts) in the domain
+ * instead of inlining the literal in the checkout use case.
+ */
+export function createPendingOrder(params: {
+  id: string;
+  items: OrderItem[];
+  idempotencyKey: string;
+  totalCents: number;
+  now: string;
+}): Order {
+  const { id, items, idempotencyKey, totalCents, now } = params;
+  return {
+    id,
+    items,
+    status: OrderStatus.PENDING,
+    history: [{ status: OrderStatus.PENDING, at: now }],
+    idempotencyKey,
+    totalCents,
+    createdAt: now,
+    updatedAt: now,
+    attempts: 0,
+  };
+}
+
 export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
   return ALLOWED[from]?.includes(to) ?? false;
 }
