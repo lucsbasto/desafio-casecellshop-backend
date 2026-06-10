@@ -1,4 +1,6 @@
 /** Centralized typed configuration, read from environment variables with safe defaults. */
+import { DEFAULT_JITTER_RATIO } from '../cache/cache-jitter';
+
 export type Driver = 'redis' | 'memory';
 
 function str(key: string, def: string): string {
@@ -25,7 +27,7 @@ export interface AppConfig {
     idempotency: Driver;
   };
   redisUrl: string;
-  cache: { productsTtlMs: number; stampedeJitterMs: number };
+  cache: { productsTtlMs: number; stampedeJitterRatio: number };
   worker: { maxAttempts: number; backoffMs: number };
   erp: { failRate: number; minLatencyMs: number; maxLatencyMs: number };
   reconcile: { ageMs: number; maxAgeMs: number };
@@ -47,7 +49,9 @@ export function loadConfig(): AppConfig {
     redisUrl: str('REDIS_URL', 'redis://localhost:6379'),
     cache: {
       productsTtlMs: num('PRODUCTS_CACHE_TTL_MS', 15000),
-      stampedeJitterMs: num('CACHE_STAMPEDE_JITTER_MS', 2000),
+      // Proportional TTL jitter (0..1) applied by the cache adapters to spread
+      // expirations and avoid a thundering herd against the backend on reload.
+      stampedeJitterRatio: num('CACHE_STAMPEDE_JITTER_RATIO', DEFAULT_JITTER_RATIO),
     },
     worker: {
       maxAttempts: num('WORKER_MAX_ATTEMPTS', 3),

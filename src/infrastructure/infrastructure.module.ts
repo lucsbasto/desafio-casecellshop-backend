@@ -34,10 +34,12 @@ const ConfigProvider: Provider = { provide: APP_CONFIG, useFactory: loadConfig }
 const CacheProvider: Provider = {
   provide: CACHE_PORT,
   inject: [APP_CONFIG, REDIS_CLIENT],
-  useFactory: (cfg: AppConfig, redis: Redis | null) =>
-    cfg.drivers.cache === 'redis'
-      ? new RedisCacheAdapter(requireRedis(redis))
-      : new InMemoryCacheAdapter(),
+  useFactory: (cfg: AppConfig, redis: Redis | null) => {
+    const opts = { jitterRatio: cfg.cache.stampedeJitterRatio };
+    return cfg.drivers.cache === 'redis'
+      ? new RedisCacheAdapter(requireRedis(redis), opts)
+      : new InMemoryCacheAdapter(opts);
+  },
 };
 
 const StockProvider: Provider = {

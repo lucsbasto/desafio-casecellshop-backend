@@ -24,11 +24,12 @@ export class ListProductsUseCase {
     private readonly tracing: TracingService,
   ) {}
 
+  /**
+   * Semantic TTL for product reads. Stampede jitter is applied by the cache
+   * adapter (infra concern), so the use case passes the plain configured TTL.
+   */
   private ttl(): number {
-    // TTL jitter to spread expirations and mitigate stampede.
-    const base = this.config.cache.productsTtlMs;
-    const jitter = Math.floor(Math.random() * this.config.cache.stampedeJitterMs);
-    return base + jitter;
+    return this.config.cache.productsTtlMs;
   }
 
   async listAll(): Promise<ProductView[]> {

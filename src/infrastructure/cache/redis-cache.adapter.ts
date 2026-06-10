@@ -1,16 +1,23 @@
 import type { Redis } from 'ioredis';
 import { CachePort } from '../../application/ports/cache.port';
+import { CacheJitterOptions, createJitter } from './cache-jitter';
 
 /**
- * Redis cache (cache-aside). In-process single-flight + TTL jitter mitigate
- * stampede; for cross-instance coordination a short SET NX lock would be used
- * (referenced in the README). Keeps the last value for stale-while-error fallback.
+ * Redis cache (cache-aside). In-process single-flight + proportional TTL jitter
+ * mitigate stampede; for cross-instance coordination a short SET NX lock would be
+ * used (referenced in the README). Keeps the last value for stale-while-error fallback.
  */
 export class RedisCacheAdapter implements CachePort {
   private readonly inflight = new Map<string, Promise<unknown>>();
   private readonly lastKnown = new Map<string, unknown>();
+  private readonly jitter: (ttlMs: number) => number;
 
-  constructor(private readonly redis: Redis) {}
+  constructor(
+    private readonly redis: Redis,
+    options: CacheJitterOptions = {},
+  ) {
+    this.jitter = createJitter(options);
+  }
 
   async get<T>(key: string): Promise<T | undefined> {
     const raw = await this.redis.get(key);
@@ -26,7 +33,7 @@ export class RedisCacheAdapter implements CachePort {
   }
 
   async set<T>(key: string, value: T, ttlMs: number): Promise<void> {
-    await this.redis.set(key, JSON.stringify(value), 'PX', Math.max(1, ttlMs));
+    await this.redis.set(key, JSON.stringify(value), 'PX', this.jitter(ttlMs));
     this.lastKnown.set(key, value);
   }
 

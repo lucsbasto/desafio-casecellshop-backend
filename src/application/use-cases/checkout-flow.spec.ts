@@ -21,7 +21,7 @@ const baseConfig = (over: Partial<AppConfig['worker']> = {}): AppConfig => ({
   logLevel: 'silent',
   drivers: { cache: 'memory', queue: 'memory', stock: 'memory', idempotency: 'memory' },
   redisUrl: '',
-  cache: { productsTtlMs: 1000, stampedeJitterMs: 0 },
+  cache: { productsTtlMs: 1000, stampedeJitterRatio: 0 },
   worker: { maxAttempts: 3, backoffMs: 0, ...over },
   erp: { failRate: 0, minLatencyMs: 0, maxLatencyMs: 0 },
   reconcile: { ageMs: 10000, maxAgeMs: 60000 },
