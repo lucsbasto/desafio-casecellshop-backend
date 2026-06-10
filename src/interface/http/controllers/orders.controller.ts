@@ -1,5 +1,10 @@
 import { Controller, Get, Param } from '@nestjs/common';
-import { ApiNotFoundResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiInternalServerErrorResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { GetOrderStatusUseCase } from '../../../application/use-cases/get-order-status.usecase';
 import { ErrorDto } from '../dto/error.dto';
 import { OrderStatusDto } from '../dto/order.dto';
@@ -12,6 +17,7 @@ export class OrdersController {
   @Get(':orderId/status')
   @ApiOkResponse({ type: OrderStatusDto, description: 'Status e histórico do pedido' })
   @ApiNotFoundResponse({ type: ErrorDto })
+  @ApiInternalServerErrorResponse({ type: ErrorDto, description: 'Erro interno inesperado' })
   async status(@Param('orderId') orderId: string): Promise<OrderStatusDto> {
     const order = await this.getStatus.execute(orderId);
     return {

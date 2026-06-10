@@ -4,6 +4,7 @@ import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiHeader,
+  ApiInternalServerErrorResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { CheckoutUseCase } from '../../../application/use-cases/checkout.usecase';
@@ -33,6 +34,7 @@ export class CheckoutController {
     type: ErrorDto,
     description: 'Estoque insuficiente ou requisição duplicada',
   })
+  @ApiInternalServerErrorResponse({ type: ErrorDto, description: 'Erro interno inesperado' })
   async start(
     @Body() body: CheckoutRequestDto,
     @Headers('idempotency-key') idempotencyKey?: string,

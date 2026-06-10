@@ -18,6 +18,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Erro interno inesperado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -51,6 +61,16 @@
           },
           "404": {
             "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro interno inesperado",
             "content": {
               "application/json": {
                 "schema": {
@@ -127,6 +147,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Erro interno inesperado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -167,6 +197,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Erro interno inesperado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -183,6 +223,11 @@
             "description": "Executa a reconciliação de pedidos PENDING órfãos"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "admin"
         ]
@@ -314,12 +359,15 @@
         "properties": {
           "productId": {
             "type": "string",
-            "example": "CAPA-001"
+            "example": "CAPA-001",
+            "maxLength": 64,
+            "pattern": "^[A-Za-z0-9_-]+$"
           },
           "quantity": {
             "type": "number",
             "example": 2,
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 1000
           }
         },
         "required": [
@@ -331,6 +379,7 @@
         "type": "object",
         "properties": {
           "items": {
+            "maxItems": 50,
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CheckoutItemDto"
