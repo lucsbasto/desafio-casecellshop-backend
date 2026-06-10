@@ -106,7 +106,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 **Por que escolhemos:** o controller deve ser fino (HTTP-only); a complexidade transacional fica numa fachada de aplicação coesa.
 
-**Tradeoffs:** use cases podem inchar se acumularem responsabilidades (o `run()` do checkout já tem ~70 linhas).
+**Tradeoffs:** use cases podem inchar se acumularem responsabilidades — por isso o `run()` do checkout foi decomposto (Extract Method `reserveItems` + factory `createPendingOrder`), ficando legível como os 4 passos do fluxo em vez de um método único longo.
 
 **Pontos positivos:** controllers triviais, lógica testável isoladamente.
 
@@ -126,21 +126,23 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ---
 
-### 9. Template Method (loop de retry da fila in-memory)
+### 9. Template Method (loop de retry da fila + base de cache)
 **Categoria:** Comportamental
-**Onde:** `src/infrastructure/queue/in-memory-queue.adapter.ts:52-69` — `run()` define o esqueleto invariante (tentar → em erro, checar `maxAttempts` → backoff → repetir → `onExhausted`), delegando os passos variáveis (`process`, `onExhausted`) ao `QueueProcessor` registrado.
+**Onde:** dois usos load-bearing do mesmo padrão:
+- **Fila in-memory:** `src/infrastructure/queue/in-memory-queue.adapter.ts:52-69` — `run()` define o esqueleto invariante (tentar → em erro, checar `maxAttempts` → backoff → repetir → `onExhausted`), delegando os passos variáveis (`process`, `onExhausted`) ao `QueueProcessor` registrado.
+- **Adapters de cache:** `src/infrastructure/cache/abstract-cache.adapter.ts:14` — `AbstractCacheAdapter` é o exemplo canônico do padrão: o método-template `getOrLoad()` (`:39-78`) implementa o algoritmo invariante (hit → single-flight → load+`set` → fallback stale-while-error) e delega às **primitivas abstratas** `get()`/`del()`/`writeStore()` (`:24,26,32`) que cada driver implementa — `InMemoryCacheAdapter` dobra o TTL jitterizado em `expiresAt` (`in-memory-cache.adapter.ts:27-29`), `RedisCacheAdapter` o passa como `PX` (`redis-cache.adapter.ts:32-34`).
 
-**Por que escolhemos:** o algoritmo de retry/compensação é fixo; o que varia é a lógica de negócio (faturar no ERP) e a compensação (liberar estoque), fornecidas pelo `CheckoutWorker`.
+**Por que escolhemos:** o algoritmo é fixo e o que varia é apenas o passo concreto. Na fila, o que varia é a lógica de negócio (faturar no ERP) e a compensação, fornecidas pelo `CheckoutWorker`. No cache, a orquestração single-flight + stale-while-error + jitter era **duplicada verbatim** entre os dois adapters; extraí-la para a superclasse (refactoring *Form Template Method*) eliminou a duplicação e deixou cada subclasse só com seu I/O específico (Map vs Redis) — um bugfix no coalescing agora é feito num lugar só.
 
-**Tradeoffs:** o "template" está acoplado à interface `QueueProcessor`; mudanças no contrato afetam ambos adapters.
+**Tradeoffs:** o "template" acopla-se ao contrato dos passos abstratos (`QueueProcessor` na fila; `get`/`writeStore`/`del` no cache); mudanças no contrato afetam todas as subclasses.
 
-**Pontos positivos:** o BullMQ adapter implementa o **mesmo** template (retry nativo + evento `failed` → `onExhausted`, `bullmq-queue.adapter.ts:68-81`), garantindo paridade comportamental memory/redis.
+**Pontos positivos:** o BullMQ adapter implementa o **mesmo** template de retry (retry nativo + evento `failed` → `onExhausted`, `bullmq-queue.adapter.ts:68-81`), garantindo paridade comportamental memory/redis; e os dois adapters de cache passaram a compartilhar uma única implementação de `getOrLoad`, com paridade garantida por characterization tests dedicados (`cache.spec.ts`).
 
 ---
 
 ### 10. Producer–Consumer / Worker Queue (Command assíncrono)
 **Categoria:** Comportamental / Arquitetural
-**Onde:** Producer: `CheckoutUseCase` enfileira `CheckoutJob` (`checkout.usecase.ts:143-145`). Consumer: `CheckoutWorker` registra-se como processor no boot (`checkout.worker.ts:29-31` `onModuleInit → queue.register(this)`) e processa (`process()` `:33`). O `CheckoutJob` (`queue.port.ts:3-7`) é efetivamente um **Command** serializável (`orderId` + `correlationId`).
+**Onde:** Producer: `CheckoutUseCase` enfileira `CheckoutJob` (`checkout.usecase.ts:109-111`). Consumer: `CheckoutWorker` registra-se como processor no boot (`checkout.worker.ts:29-31` `onModuleInit → queue.register(this)`) e processa (`process()` `:33`). O `CheckoutJob` (`queue.port.ts:3-7`) é efetivamente um **Command** serializável (`orderId` + `correlationId`).
 
 **Por que escolhemos:** o ERP é lento e instável (offender do case). Desacoplar a faturação do request HTTP permite responder `202` rápido e processar em background com retry — o coração da solução.
 
@@ -194,11 +196,11 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 14. Idempotência (Idempotency Key + dedupe atômico)
 **Categoria:** Comportamental / Confiabilidade
-**Onde:** Port `IdempotencyPort.remember()` (`idempotency.port.ts:13-21`). Adapter Redis usa Lua `SET NX PX` + `GET` atômico (`redis-idempotency.adapter.ts:12-16`) para fechar a janela TOCTOU. Adapter in-memory usa seção crítica síncrona (`in-memory-idempotency.adapter.ts:15-23`). No use case, é o **primeiro passo** (`checkout.usecase.ts:88-97`): chave já vista → replay do pedido existente. **Além disso**, o worker é idempotente: ignora pedidos terminais/inexistentes e guarda contra duplo-processamento em `PROCESSING` (`checkout.worker.ts:51-69`).
+**Onde:** Port `IdempotencyPort.remember()` (`idempotency.port.ts:13-21`). Adapter Redis usa Lua `SET NX PX` + `GET` atômico (`redis-idempotency.adapter.ts:12-16`) para fechar a janela TOCTOU. Adapter in-memory usa seção crítica síncrona (`in-memory-idempotency.adapter.ts:15-23`). No use case, é o **primeiro passo** (`checkout.usecase.ts:83-93`): chave já vista → replay do pedido existente. **Além disso**, o worker é idempotente: ignora pedidos terminais/inexistentes e guarda contra duplo-processamento em `PROCESSING` (`checkout.worker.ts:51-69`).
 
 **Por que escolhemos:** retries de rede e duplo-clique do cliente não podem gerar pedidos/faturamentos duplicados. Idempotência no produtor (chave) e no consumidor (estado terminal/PROCESSING) é defesa em profundidade.
 
-**Tradeoffs:** TTL da chave (`IDEMPOTENCY_TTL_MS`, 24h) precisa ser dimensionado; chave reclamada sem pedido persistido vira `DuplicateRequestError` → 409 (`checkout.usecase.ts:96`), um caso de borda que exige documentação.
+**Tradeoffs:** TTL da chave (`IDEMPOTENCY_TTL_MS`, 24h) precisa ser dimensionado; chave reclamada sem pedido persistido vira `DuplicateRequestError` → 409 (`checkout.usecase.ts:92`), um caso de borda que exige documentação.
 
 **Pontos positivos:** "exactly-once" prático na perspectiva do cliente; tolerância a retry sem efeitos colaterais.
 
@@ -207,7 +209,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 ### 15. Compensating Transaction (compensação de estoque / sabor Saga)
 **Categoria:** Comportamental / Confiabilidade
 **Onde:** três pontos de compensação que liberam o estoque reservado:
-- Falha durante a reserva multi-item no checkout: libera o que já reservou (`checkout.usecase.ts:119-125`).
+- Falha durante a reserva multi-item no checkout: libera o que já reservou, no método extraído `reserveItems` (`checkout.usecase.ts:144-150`).
 - Worker esgotou tentativas: `onExhausted` → `FAILED` + `stock.release` por item (`checkout.worker.ts:100-123`).
 - Reconciliação de PENDING órfão muito antigo: `FAILED` + release (`reconcile.usecase.ts:42-54`).
 
@@ -245,11 +247,12 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 18. Cache-Aside + Single-Flight + Stale-While-Error + TTL Jitter
 **Categoria:** Arquitetural / Performance
-**Onde:** Port `CachePort.getOrLoad()` (`cache.port.ts:18-23`). Implementações:
-- **Cache-aside**: tenta cache; em miss roda `loader`, grava com TTL (`redis-cache.adapter.ts:43-58`, `in-memory-cache.adapter.ts:38-65`).
-- **Single-flight**: mapa `inflight` coalesce misses concorrentes na **mesma** chave numa única execução do loader (`in-memory-cache.adapter.ts:49-54`, `redis-cache.adapter.ts:46-58`) — anti-stampede.
-- **Stale-while-error**: se o loader falha e `staleOnError`, serve `lastKnown` (`in-memory-cache.adapter.ts:70-76`).
-- **TTL jitter**: aplicado no **adapter** de cache (`cache-jitter.ts` → `createJitter()`), modelo **proporcional** `[ttl, ttl*(1+ratio)]` com `stampedeJitterRatio` (`app-config.ts`); o `ttl()` em `list-products.usecase.ts` passa o TTL puro. Espalha expirações para evitar stampede.
+**Onde:** Port `CachePort.getOrLoad()` (`cache.port.ts:18-23`). A orquestração comum mora na base `AbstractCacheAdapter` (Template Method, ver #9); cada driver fornece só o armazenamento:
+- **Cache-aside**: tenta cache; em miss roda `loader`, grava com TTL via `set` (`abstract-cache.adapter.ts:34-37`, `:57-65`).
+- **Single-flight**: mapa `inflight` coalesce misses concorrentes na **mesma** chave numa única execução do loader (`abstract-cache.adapter.ts:50-66`) — anti-stampede.
+- **Stale-while-error**: se o loader falha e `staleOnError`, serve `lastKnown` (`abstract-cache.adapter.ts:71-76`).
+- **TTL jitter**: aplicado na base via `createJitter()` (`abstract-cache.adapter.ts:35`, `cache-jitter.ts`), modelo **proporcional** `[ttl, ttl*(1+ratio)]` com `stampedeJitterRatio` (`app-config.ts`); o `set` repassa o TTL já jitterizado à primitiva `writeStore` do driver. O `ttl()` em `list-products.usecase.ts` passa o TTL puro.
+- **Armazenamento por driver**: `InMemoryCacheAdapter` (Map + `expiresAt`, `in-memory-cache.adapter.ts:17-33`) e `RedisCacheAdapter` (JSON + `PX` + evicção de valor corrompido, `redis-cache.adapter.ts:19-38`).
 - Uso: `ListProductsUseCase.listAll()` (`list-products.usecase.ts:34-45`).
 
 **Por que escolhemos:** o catálogo é lido com alta frequência e o **repositório de catálogo** simula 40ms de latência (`in-memory-product.repo.ts:22`, modelando uma API síncrona) — distinto do ERP de faturamento, que simula 50–300ms (`ERP_MIN/MAX_LATENCY_MS`, `app-config.ts:58-59`). Cache reduz pressão e latência; single-flight + jitter previnem stampede quando a chave expira sob carga; stale-on-error mantém a vitrine viva se o ERP cair.
@@ -274,7 +277,7 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 20. Outbox (lógico / leve)
 **Categoria:** Arquitetural / Confiabilidade
-**Onde:** documentado no port (`queue.port.ts:19-24` "The queue acts as a 'logical outbox'") e implementado pela **ordem** em `checkout.usecase.ts:127-145`: salva PENDING (source of truth) → enfileira. Comentário `:142` "If this fails, reconciliation will re-enqueue".
+**Onde:** documentado no port (`queue.port.ts:19-24` "The queue acts as a 'logical outbox'") e implementado pela **ordem** em `checkout.usecase.ts:98-112`: salva PENDING (source of truth) → enfileira. Comentário `:108` "If this fails, reconciliation will re-enqueue".
 
 **Por que escolhemos:** garantir que o pedido só seja perdido se a persistência falhar; o enfileiramento é recuperável via reconciliação. É um Outbox "pobre" — sem tabela outbox transacional, mas com o mesmo objetivo (evitar mensagem-fantasma / ghost order).
 
@@ -286,11 +289,11 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ## Padrões de Domínio / Observabilidade
 
-### 21. Entity, Value Object e funções de domínio puras
-**Categoria:** DDD táctico
-**Onde:** `Order` é a Entity com identidade (`order.ts:25-36`). `ProductView`/`toProductView` (`product.ts:14-30`) é um Value/view object. `tryReserve`/`release` (`stock.ts:13-21`) e `transition` (`order.ts:60`) são funções puras de domínio. `OrderStatus` é enum (`order.ts:3-12`). `DomainError` hierárquico com `code` (`errors.ts:5-41`).
+### 21. Entity, Value Object, Factory Method e funções de domínio puras
+**Categoria:** DDD táctico / Criacional
+**Onde:** `Order` é a Entity com identidade (`order.ts:25-36`). `ProductView`/`toProductView` (`product.ts:14-30`) é um Value/view object. `tryReserve`/`release` (`stock.ts:13-21`) e `transition` (`order.ts:86`) são funções puras de domínio. `OrderStatus` é enum (`order.ts:3-12`). `DomainError` hierárquico com `code` (`errors.ts:5-47`). **Factory Method de domínio:** `createPendingOrder()` (`order.ts:57-76`) centraliza a forma do "pedido recém-nascido" (status `PENDING`, history seed, `attempts: 0`) no domínio — extraída do literal antes inline no `CheckoutUseCase.run` (refactoring *Move Method*), de modo que o use case agora só invoca a fábrica (`checkout.usecase.ts:99-105`).
 
-**Por que escolhemos:** isolar a regra de negócio (estado válido, reserva, preço em centavos para evitar float — `product.ts:3`) em código puro, testável sem mocks e independente de infra.
+**Por que escolhemos:** isolar a regra de negócio (estado válido, reserva, preço em centavos para evitar float — `product.ts:3`, e a construção consistente do agregado `Order`) em código puro, testável sem mocks e independente de infra.
 
 **Tradeoffs:** modelo anêmico em partes (lógica em funções livres em vez de métodos da entidade) — escolha pragmática para TS funcional.
 
@@ -300,11 +303,11 @@ Também `RedisProvider` (`src/infrastructure/redis.provider.ts:16-27`) que cria 
 
 ### 22. Domain Error → HTTP (tradução por Exception Filter)
 **Categoria:** Estrutural (anti-corruption na borda)
-**Onde:** `DomainError` carrega `code` semântico (`errors.ts:5-13`); o filter `statusFor()` mapeia tipo de erro → status HTTP (`domain-exception.filter.ts:22-34`): `*NotFound`→404, `InsufficientStock`/`InvalidTransition`/`DuplicateRequest`→409, resto→500.
+**Onde:** `DomainError` carrega `code` semântico (`errors.ts:5-13`) e **toda** a hierarquia de erros de domínio o estende — inclusive `DuplicateRequestError` (`errors.ts:44-47`, antes solto em `checkout.usecase.ts` estendendo `Error`; trazido à hierarquia no refactoring). O filter `statusFor()` mapeia tipo de erro → status HTTP (`domain-exception.filter.ts:22-34`): `*NotFound`→404, `InsufficientStock`/`InvalidTransition`/`DuplicateRequest`→409, resto→500. Com todos sendo `DomainError`, o guard do filter virou um único `instanceof DomainError` (`domain-exception.filter.ts:60`), sem ramo especial nem cast frágil.
 
-**Por que escolhemos:** manter o domínio sem conhecer HTTP, centralizando a tradução num único elo do pipeline.
+**Por que escolhemos:** manter o domínio sem conhecer HTTP, centralizando a tradução num único elo do pipeline; e ter uma hierarquia de erros única (`code` + nome) que o filter consome de forma uniforme.
 
-**Tradeoffs:** o filter precisa conhecer todos os tipos de erro do domínio (acoplamento de mão única).
+**Tradeoffs:** o filter precisa conhecer os tipos de erro do domínio para o mapeamento de status (acoplamento de mão única, intencional na borda).
 
 **Pontos positivos:** corpo de erro padronizado (`ErrorDto`) com `correlationId` e `timestamp`; domínio limpo.
 
@@ -474,7 +477,7 @@ Esta seção é o "porquê do que falta". Em cada caso a ausência foi conscient
 | 6 | DTO + validação | Estrutural | `checkout.dto.ts:18-43`, `main.ts:18` | Contrato e 400 automáticos |
 | 7 | Facade | Estrutural | `checkout.usecase.ts:57` | Controllers finos |
 | 8 | Strategy | Comportamental | `backoff.strategy.ts:9-27` | Backoff reutilizável/testável |
-| 9 | Template Method | Comportamental | `in-memory-queue.adapter.ts:52-69` | Esqueleto de retry invariante |
+| 9 | Template Method | Comportamental | `in-memory-queue.adapter.ts:52-69`, `abstract-cache.adapter.ts:14` | Esqueleto invariante (retry da fila + getOrLoad do cache) |
 | 10 | Producer–Consumer / Command | Comportamental | `checkout.usecase.ts:143`, `checkout.worker.ts:29` | Checkout assíncrono resiliente |
 | 11 | State Machine | Comportamental | `order.ts:39-71` | Transições inválidas impossíveis |
 | 12 | Chain of Responsibility | Comportamental | middleware/guard/pipe/filter | Concerns transversais isolados |
@@ -483,10 +486,10 @@ Esta seção é o "porquê do que falta". Em cada caso a ausência foi conscient
 | 15 | Compensating Transaction | Confiabilidade | `checkout.worker.ts:100-123` | Estoque nunca preso |
 | 16 | Retry + Backoff | Confiabilidade | `bullmq-queue.adapter.ts:51`, `backoff.strategy.ts` | Absorve falhas do ERP |
 | 17 | Dead Letter Queue | Confiabilidade | `bullmq-queue.adapter.ts:55` | Auditoria de falhas |
-| 18 | Cache-Aside (+single-flight/stale/jitter) | Performance | `*-cache.adapter.ts`, `cache-jitter.ts` | Baixa latência, anti-stampede |
+| 18 | Cache-Aside (+single-flight/stale/jitter) | Performance | `abstract-cache.adapter.ts`, `cache-jitter.ts` | Baixa latência, anti-stampede |
 | 19 | Reconciliation | Confiabilidade | `reconcile.usecase.ts:21` | Sem pedido órfão eterno |
 | 20 | Outbox (lógico) | Confiabilidade | `checkout.usecase.ts:127-145` | Sem perda silenciosa de pedido |
-| 21 | Entity / VO / funções puras | DDD | `order.ts`, `stock.ts`, `product.ts` | Regra testável sem infra |
+| 21 | Entity / VO / Factory Method / funções puras | DDD / Criacional | `order.ts` (`createPendingOrder:57`), `stock.ts`, `product.ts` | Regra testável sem infra; agregado construído de forma consistente |
 | 22 | Domain Error → HTTP | Estrutural | `domain-exception.filter.ts:22-34` | Domínio agnóstico de HTTP |
 | 23 | Ambient Context (ALS) | Comportamental | `correlation.ts:12` | Traceabilidade ponta a ponta |
 | 24 | Observer | Comportamental | `bullmq-queue.adapter.ts:68` | Reação desacoplada a eventos |
